@@ -1,0 +1,47 @@
+# Environnements virtuels
+venv/
+env/
+.env/
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Base de données SQLite
+*.sqlite3
+*.db
+
+# Fichiers de média et d'upload
+media/
+uploads/
+
+# Fichiers statiques collectés
+staticfiles/
+
+# Fichiers de configuration locale
+local_settings.py
+
+# Fichiers de log
+*.log
+
+# Fichiers du système d'exploitation
+.DS_Store
+Thumbs.db
+
+# Fichiers IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Migrations Django
+# migrations/
+
+# Fichiers Excel de test
+*.xlsx
+*.xls
+
+# Pycache
+*.pyc

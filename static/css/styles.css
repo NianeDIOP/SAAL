@@ -1,0 +1,174 @@
+/* Styles généraux */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+}
+
+/* Styles de la navbar */
+.navbar {
+    padding: 0.8rem 1rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+}
+
+.navbar-brand i {
+    font-size: 1.3rem;
+}
+
+.nav-link {
+    font-size: 0.95rem;
+    padding: 0.6rem 1rem !important;
+    transition: all 0.3s ease;
+    border-radius: 5px;
+    margin: 0 2px;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link.active {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Styles des cartes */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Styles des boutons */
+.btn {
+    border-radius: 5px;
+    padding: 0.5rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #3b7ddd;
+    border-color: #3b7ddd;
+}
+
+.btn-primary:hover {
+    background-color: #2d6bbd;
+    border-color: #2d6bbd;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #218838;
+}
+
+/* Styles des icônes */
+.fas, .fab, .far {
+    transition: transform 0.3s ease;
+}
+
+.card:hover .fas {
+    transform: scale(1.2);
+}
+
+/* Styles des formulaires */
+.form-control, .form-select {
+    padding: 0.5rem 0.75rem;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #3b7ddd;
+    box-shadow: 0 0 0 0.2rem rgba(59, 125, 221, 0.25);
+}
+
+/* Style du footer */
+footer {
+    margin-top: auto;
+    font-size: 0.9rem;
+}
+
+/* Styles des onglets dans configuration */
+.nav-tabs .nav-link, .list-group-item {
+    transition: all 0.2s ease;
+}
+
+.list-group-item.active {
+    background-color: #3b7ddd;
+    border-color: #3b7ddd;
+}
+
+/* Style des tableaux */
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+/* Alertes et messages */
+.alert {
+    border-radius: 8px;
+}
+
+/* Animation pour les cartes d'accueil */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.home-card {
+    animation: fadeIn 0.6s ease-out forwards;
+}
+
+.home-card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.home-card:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.home-card:nth-child(3) {
+    animation-delay: 0.3s;
+}

@@ -1,0 +1,46 @@
+{% extends 'core/semestre1/base_semestre1.html' %}
+
+{% block title %}SAAL - Suppression de l'importation{% endblock %}
+
+{% block semestre1_title %}Confirmation de suppression{% endblock %}
+{% block semestre1_subtitle %}
+    Vous êtes sur le point de supprimer l'importation "{{ import.titre }}"
+{% endblock %}
+
+{% block semestre1_content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Attention</h5>
+            </div>
+            <div class="card-body">
+                <p>Vous êtes sur le point de supprimer définitivement l'importation suivante :</p>
+                
+                <div class="alert alert-secondary">
+                    <ul class="mb-0">
+                        <li><strong>Titre :</strong> {{ import.titre }}</li>
+                        <li><strong>Date d'importation :</strong> {{ import.date_import|date:"d/m/Y à H:i" }}</li>
+                        <li><strong>Semestre :</strong> {{ import.get_semestre_display }}</li>
+                        <li><strong>Année scolaire :</strong> {{ import.annee_scolaire }}</li>
+                    </ul>
+                </div>
+                
+                <p class="text-danger">Cette action est irréversible et supprimera également toutes les moyennes et données associées.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:semestre1_importation_detail' import.id %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>Annuler
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-2"></i>Confirmer la suppression
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

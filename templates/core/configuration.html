@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+
+{% block title %}SAAL - Configuration{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h2 mb-3 fw-bold"><i class="fas fa-cog me-2 text-primary"></i>Configuration de l'application</h1>
+        <p class="text-muted">Configurez les paramètres nécessaires avant d'utiliser les modules d'analyse.</p>
+        <hr class="mb-4">
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="list-group shadow-sm rounded">
+            <a href="#etablissement" class="list-group-item list-group-item-action {% if active_tab == 'etablissement' %}active{% endif %}" data-bs-toggle="list">
+                <i class="fas fa-school me-2"></i>Établissement
+            </a>
+            <a href="#inspection" class="list-group-item list-group-item-action {% if active_tab == 'inspection' %}active{% endif %}" data-bs-toggle="list">
+                <i class="fas fa-building me-2"></i>Inspection Académique
+            </a>
+            <a href="#annee_scolaire" class="list-group-item list-group-item-action {% if active_tab == 'annee_scolaire' %}active{% endif %}" data-bs-toggle="list">
+                <i class="fas fa-calendar-alt me-2"></i>Année Scolaire
+            </a>
+            <a href="#niveaux" class="list-group-item list-group-item-action {% if active_tab == 'niveaux' %}active{% endif %}" data-bs-toggle="list">
+                <i class="fas fa-layer-group me-2"></i>Niveaux
+            </a>
+            <a href="#classes" class="list-group-item list-group-item-action {% if active_tab == 'classes' %}active{% endif %}" data-bs-toggle="list">
+                <i class="fas fa-users me-2"></i>Classes
+            </a>
+        </div>
+    </div>
+    
+    <div class="col-md-9">
+        <div class="tab-content">
+            <!-- Établissement -->
+            <div class="tab-pane fade {% if active_tab == 'etablissement' %}show active{% endif %}" id="etablissement">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-school me-2"></i>Informations de l'établissement</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'core:configuration' %}" enctype="multipart/form-data" id="form-etablissement">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="etablissement">
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-12">
+                                    <label for="nom" class="form-label">Nom de l'établissement*</label>
+                                    <input type="text" class="form-control form-control-lg" id="nom" name="nom" value="{{ etablissement.nom|default:'' }}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="adresse" class="form-label">Adresse</label>
+                                <textarea class="form-control" id="adresse" name="adresse" rows="2">{{ etablissement.adresse|default:'' }}</textarea>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="telephone" class="form-label">Téléphone</label>
+                                    <input type="text" class="form-control" id="telephone" name="telephone" value="{{ etablissement.telephone|default:'' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email" value="{{ etablissement.email|default:'' }}">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="logo" class="form-label">Logo de l'établissement</label>
+                                <input type="file" class="form-control" id="logo" name="logo" accept="image/*">
+                                {% if etablissement.logo %}
+                                <div class="mt-2">
+                                    <img src="{{ etablissement.logo.url }}" alt="Logo" class="img-thumbnail" style="max-height: 100px;">
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save me-2"></i>Enregistrer les informations
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inspection Académique -->
+            <div class="tab-pane fade {% if active_tab == 'inspection' %}show active{% endif %}" id="inspection">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-building me-2"></i>Inspection Académique</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'core:configuration' %}" id="form-inspection">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="inspection">
+                            
+                            <div class="mb-4">
+                                <label for="inspection_nom" class="form-label">Nom de l'inspection académique*</label>
+                                <input type="text" class="form-control form-control-lg" id="inspection_nom" name="nom" value="{{ inspection.nom|default:'' }}" required>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save me-2"></i>Enregistrer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Année Scolaire -->
+            <div class="tab-pane fade {% if active_tab == 'annee_scolaire' %}show active{% endif %}" id="annee_scolaire">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Année Scolaire</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            L'année scolaire active est : <strong>{{ etablissement.annee_scolaire_active }}</strong>
+                        </div>
+                        <form method="post" action="{% url 'core:configuration' %}" id="form-annee">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="annee_scolaire">
+                            
+                            <div class="mb-4">
+                                <label for="annee" class="form-label">Nouvelle année scolaire active*</label>
+                                <input type="text" class="form-control form-control-lg" id="annee" name="annee" placeholder="Ex: 2024-2025" required>
+                                <div class="form-text">Définissez ici l'année scolaire active pour l'application.</div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-check me-2"></i>Définir comme année active
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Niveaux -->
+            <div class="tab-pane fade {% if active_tab == 'niveaux' %}show active{% endif %}" id="niveaux">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-layer-group me-2"></i>Gestion des niveaux</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-7">
+                                <h6 class="mb-3">Niveaux configurés</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Nom</th>
+                                                <th>Ordre</th>
+                                                <th class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for niveau in niveaux %}
+                                            <tr>
+                                                <td>{{ niveau.nom }}</td>
+                                                <td>{{ niveau.ordre }}</td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editNiveauModal" 
+                                                            data-id="{{ niveau.id }}" data-nom="{{ niveau.nom }}" data-description="{{ niveau.description }}" data-ordre="{{ niveau.ordre }}">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="3" class="text-center">Aucun niveau configuré.</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <h6 class="mb-3">Ajouter un niveau</h6>
+                                <form method="post" action="{% url 'core:configuration' %}" id="form-niveau">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="niveau">
+                                    
+                                    <div class="mb-3">
+                                        <label for="niveau_nom" class="form-label">Nom*</label>
+                                        <input type="text" class="form-control" id="niveau_nom" name="nom" placeholder="Ex: 6ème" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="niveau_description" class="form-label">Description</label>
+                                        <input type="text" class="form-control" id="niveau_description" name="description">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="niveau_ordre" class="form-label">Ordre</label>
+                                        <input type="number" class="form-control" id="niveau_ordre" name="ordre" value="0">
+                                        <div class="form-text text-muted">L'ordre permet de trier les niveaux (ex: 1 pour 6ème, 2 pour 5ème, etc.)</div>
+                                    </div>
+                                    
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-plus me-2"></i>Ajouter
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Classes -->
+            <div class="tab-pane fade {% if active_tab == 'classes' %}show active{% endif %}" id="classes">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-users me-2"></i>Gestion des classes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Vous configurez les classes pour l'année scolaire <strong>{{ etablissement.annee_scolaire_active }}</strong>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-7">
+                                <h6 class="mb-3">Classes configurées</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Nom</th>
+                                                <th>Niveau</th>
+                                                <th class="text-center">Effectif</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for classe in classes %}
+                                            <tr>
+                                                <td>{{ classe.nom }}</td>
+                                                <td>{{ classe.niveau.nom }}</td>
+                                                <td class="text-center">{{ classe.effectif }}</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="3" class="text-center">Aucune classe configurée.</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <h6 class="mb-3">Ajouter une classe</h6>
+                                <form method="post" action="{% url 'core:configuration' %}" id="form-classe">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="classe">
+                                    
+                                    <div class="mb-3">
+                                        <label for="classe_nom" class="form-label">Nom*</label>
+                                        <input type="text" class="form-control" id="classe_nom" name="nom" placeholder="Ex: 6ème A" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="classe_niveau" class="form-label">Niveau*</label>
+                                        <select class="form-select" id="classe_niveau" name="niveau" required>
+                                            <option value="">-- Sélectionner --</option>
+                                            {% for niveau in niveaux %}
+                                            <option value="{{ niveau.id }}">{{ niveau.nom }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="classe_effectif" class="form-label">Effectif</label>
+                                        <input type="number" class="form-control" id="classe_effectif" name="effectif" value="0">
+                                    </div>
+                                    
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-plus me-2"></i>Ajouter
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Édition Niveau -->
+<div class="modal fade" id="editNiveauModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier le niveau</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'core:configuration' %}" id="form-edit-niveau">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="edit_niveau">
+                    <input type="hidden" name="niveau_id" id="edit_niveau_id">
+                    
+                    <div class="mb-3">
+                        <label for="edit_niveau_nom" class="form-label">Nom*</label>
+                        <input type="text" class="form-control" id="edit_niveau_nom" name="nom" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit_niveau_description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="edit_niveau_description" name="description">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit_niveau_ordre" class="form-label">Ordre</label>
+                        <input type="number" class="form-control" id="edit_niveau_ordre" name="ordre">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="submit" form="form-edit-niveau" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Préserver l'onglet actif
+    document.addEventListener('DOMContentLoaded', function() {
+        // Activer l'onglet par défaut basé sur la session
+        const activeTab = '{{ active_tab }}';
+        if (activeTab) {
+            const triggerEl = document.querySelector('a[href="#' + activeTab + '"]');
+            if (triggerEl) {
+                const tab = new bootstrap.Tab(triggerEl);
+                tab.show();
+            }
+        }
+        
+        // Conserver l'onglet actif lors des clics
+        const tabLinks = document.querySelectorAll('.list-group-item');
+        tabLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                const tabId = this.getAttribute('href').substring(1);
+                // Stocker dans sessionStorage pour persistance entre rechargements
+                sessionStorage.setItem('activeConfigTab', tabId);
+            });
+        });
+        
+        // Modal édition niveau
+        const editNiveauModal = document.getElementById('editNiveauModal');
+        if (editNiveauModal) {
+            editNiveauModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const id = button.getAttribute('data-id');
+                const nom = button.getAttribute('data-nom');
+                const description = button.getAttribute('data-description');
+                const ordre = button.getAttribute('data-ordre');
+                
+                document.getElementById('edit_niveau_id').value = id;
+                document.getElementById('edit_niveau_nom').value = nom;
+                document.getElementById('edit_niveau_description').value = description || '';
+                document.getElementById('edit_niveau_ordre').value = ordre;
+            });
+        }
+    });
+</script>
+{% endblock %}

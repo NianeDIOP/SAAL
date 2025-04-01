@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+        <div class="list-group shadow-sm">
+            <a href="{% url 'core:semestre1_accueil' %}" class="list-group-item list-group-item-action 
+                {% if request.path == '/semestre1/' %}active{% endif %}">
+                <i class="fas fa-home me-2"></i>Vue d'ensemble
+            </a>
+            <a href="{% url 'core:semestre1_importation' %}" class="list-group-item list-group-item-action
+                {% if request.path == '/semestre1/importation/' %}active{% endif %}">
+                <i class="fas fa-file-import me-2"></i>Importation
+            </a>
+        </div>
+    </div>
+    
+    <!-- Contenu principal -->
+    <div class="col-md-9">
+        <div class="page-header mb-4">
+            <h1 class="h2 fw-bold text-primary">
+                {% block semestre1_title %}Module Semestre 1{% endblock %}
+            </h1>
+            <p class="text-muted">
+                {% block semestre1_subtitle %}{% endblock %}
+            </p>
+        </div>
+        
+        {% block semestre1_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

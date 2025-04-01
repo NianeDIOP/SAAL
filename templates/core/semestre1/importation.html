@@ -1,0 +1,130 @@
+{% extends 'core/semestre1/base_semestre1.html' %}
+
+{% block title %}SAAL - Semestre 1 - Importation{% endblock %}
+
+{% block semestre1_title %}Importation des données - Semestre 1{% endblock %}
+{% block semestre1_subtitle %}
+    Importez et nettoyez les fichiers Excel exportés depuis la plateforme Planète
+{% endblock %}
+
+{% block semestre1_content %}
+<div class="row g-4">
+    <!-- Formulaire d'importation -->
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-primary"><i class="fas fa-file-import me-2"></i>Nouvelle importation</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'core:semestre1_importation' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="titre" class="form-label">Titre de l'importation*</label>
+                        <input type="text" class="form-control" id="titre" name="titre" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="fichier_excel" class="form-label">Fichier Excel*</label>
+                        <input type="file" class="form-control" id="fichier_excel" name="fichier_excel" accept=".xlsx, .xls" required>
+                        <div class="form-text">Sélectionnez un fichier Excel exporté depuis la plateforme Planète.</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="classe" class="form-label">Classe associée</label>
+                        <select class="form-select" id="classe" name="classe">
+                            <option value="">-- Sélectionner une classe --</option>
+                            {% for classe in classes %}
+                            <option value="{{ classe.id }}">{{ classe.nom }} ({{ classe.niveau.nom }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Facultatif: associez ces données à une classe spécifique.</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Importer et nettoyer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-primary"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
+            </div>
+            <div class="card-body">
+                <p>Le processus d'importation traite automatiquement :</p>
+                <ul>
+                    <li>L'onglet "Moyennes eleves" (en ignorant les 11 premières lignes)</li>
+                    <li>L'onglet "Données détaillées" (en ignorant les 8 premières lignes)</li>
+                    <li>La fusion des informations élèves avec leurs moyennes par discipline</li>
+                </ul>
+                <p>Assurez-vous que votre fichier Excel respecte la structure attendue des exports Planète.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Historique des importations -->
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-primary"><i class="fas fa-history me-2"></i>Historique des importations</h5>
+            </div>
+            <div class="card-body">
+                {% if imports %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Titre</th>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for import in imports %}
+                            <tr>
+                                <td>{{ import.titre }}</td>
+                                <td>{{ import.date_import|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    {% if import.statut == 'termine' %}
+                                    <span class="badge bg-success">Terminé</span>
+                                    {% elif import.statut == 'en_cours' %}
+                                    <span class="badge bg-warning">En cours</span>
+                                    {% else %}
+                                    <span class="badge bg-danger" data-bs-toggle="tooltip" title="{{ import.erreur_message }}">Erreur</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'core:semestre1_importation_detail' import.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ import.fichier.url }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                        <a href="{% url 'core:semestre1_importation_delete' import.id %}" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Aucune importation effectuée pour le semestre 1.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
