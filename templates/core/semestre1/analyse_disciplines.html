@@ -1,0 +1,394 @@
+{% extends 'core/semestre1/base_semestre1.html' %}
+{% load custom_filters %}
+
+{% block title %}SAAL - Analyse des disciplines - Semestre 1{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
+<style>
+    .stat-card {
+        border-radius: 10px;
+        background-color: #fff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+    
+    .discipline-stat-icon {
+        font-size: 2.5rem;
+        color: #3b7ddd;
+    }
+    
+    .distribution-bar {
+        transition: all 0.3s ease;
+    }
+    
+    .distribution-bar:hover {
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block semestre1_title %}Analyse des disciplines - Semestre 1{% endblock %}
+{% block semestre1_subtitle %}
+    Année scolaire {{ etablissement.annee_scolaire_active }}
+{% endblock %}
+
+{% block semestre1_content %}
+<!-- Filtres -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0 text-primary"><i class="fas fa-filter me-2"></i>Filtres</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" id="filtres-form" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label for="niveau" class="form-label small">Niveau</label>
+                <select class="form-select form-select-sm" id="niveau" name="niveau">
+                    <option value="">Tous les niveaux</option>
+                    {% for niveau in niveaux %}
+                    <option value="{{ niveau.id }}" {% if selected_niveau == niveau.id|stringformat:"s" %}selected{% endif %}>
+                        {{ niveau.nom }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="classe" class="form-label small">Classe</label>
+                <select class="form-select form-select-sm" id="classe" name="classe">
+                    <option value="">Toutes les classes</option>
+                    {% for classe in classes %}
+                    <option value="{{ classe.id }}" {% if selected_classe == classe.id|stringformat:"s" %}selected{% endif %}>
+                        {{ classe.nom }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="import" class="form-label small">Importation</label>
+                <select class="form-select form-select-sm" id="import" name="import">
+                    <option value="">Toutes les importations</option>
+                    {% for import in imports %}
+                    <option value="{{ import.id }}" {% if selected_import == import.id|stringformat:"s" %}selected{% endif %}>
+                        {{ import.titre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="discipline" class="form-label small">Discipline</label>
+                <select class="form-select form-select-sm" id="discipline" name="discipline" required>
+                    <option value="">Sélectionner une discipline</option>
+                    {% for discipline in disciplines_disponibles %}
+                    <option value="{{ discipline }}" {% if selected_discipline == discipline %}selected{% endif %}>
+                        {{ discipline }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="sexe" class="form-label small">Sexe</label>
+                <select class="form-select form-select-sm" id="sexe" name="sexe">
+                    <option value="">Tous</option>
+                    <option value="M" {% if selected_sexe == "M" %}selected{% endif %}>Masculin</option>
+                    <option value="F" {% if selected_sexe == "F" %}selected{% endif %}>Féminin</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="d-flex gap-2" id="filtre-actions">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill h-100">
+                        <i class="fas fa-search me-1"></i>Filtrer
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill h-100" onclick="resetFilters()">
+                        <i class="fas fa-sync me-1"></i>Réinitialiser
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Contenu principal -->
+{% if selected_discipline %}
+    {% if donnees_discipline %}
+    <div class="row g-4">
+        <!-- Statistiques de la discipline -->
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-book me-2"></i>Analyse de la discipline : {{ selected_discipline }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Statistiques générales -->
+                        <div class="col-md-4">
+                            <div class="card stat-card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fas fa-chart-line discipline-stat-icon me-3"></i>
+                                        <h6 class="card-title mb-0">Statistiques principales</h6>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6 mb-2">
+                                            <small class="text-muted d-block">Nombre d'élèves</small>
+                                            <strong>{{ stats_discipline.nombre_eleves }}</strong>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <small class="text-muted d-block">Moyenne générale</small>
+                                            <strong>{{ stats_discipline.moyenne_globale|floatformat:2 }}</strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Note minimale</small>
+                                            <strong>{{ stats_discipline.min_moyenne|floatformat:2 }}</strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Note maximale</small>
+                                            <strong>{{ stats_discipline.max_moyenne|floatformat:2 }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Distribution des notes -->
+                        <div class="col-md-8">
+                            <div class="card stat-card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-chart-bar me-2 text-primary"></i>Distribution des notes
+                                    </h6>
+                                    <canvas id="distributionChart" class="chart-container"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tableau des élèves -->
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-primary">
+                            <i class="fas fa-table me-2"></i>Détails des notes par élève
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="exportTableToCSV()">
+                                <i class="fas fa-file-csv me-1"></i>Exporter CSV
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="printTable()">
+                                <i class="fas fa-print me-1"></i>Imprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="notes-table" class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Prénom</th>
+                                    <th>Classe</th>
+                                    <th class="text-end">Note</th>
+                                    <th>Informations supplémentaires</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for eleve in donnees_discipline %}
+                                <tr>
+                                    <td>{{ eleve.nom }}</td>
+                                    <td>{{ eleve.prenom|default:'-' }}</td>
+                                    <td>{{ eleve.classe|default:'-' }}</td>
+                                    <td class="text-end fw-bold">
+                                        {{ eleve.disciplines|get_item:selected_discipline|add:" Moy D"|get_item:eleve.disciplines|floatformat:2 }}
+                                    </td>
+                                    <td>
+                                        {% for key, value in eleve.disciplines.items %}
+                                            {% if key != selected_discipline|add:" Moy D" and value %}
+                                                <span class="badge bg-secondary me-1">{{ key }}: {{ value }}</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Aucune donnée trouvée pour la discipline "{{ selected_discipline }}". 
+        Veuillez ajuster vos filtres.
+    </div>
+    {% endif %}
+{% else %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    Veuillez sélectionner une discipline pour commencer l'analyse.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialiser DataTable
+    $('#notes-table').DataTable({
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+        },
+        responsive: true,
+        order: [[3, 'desc']], // Trier par note décroissante
+        pageLength: 25
+    });
+
+    // Distribution des notes
+    {% if distribution_notes %}
+    const ctx = document.getElementById('distributionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ distribution_notes.labels|safe }},
+            datasets: [{
+                label: 'Distribution des notes',
+                data: {{ distribution_notes.data|safe }},
+                backgroundColor: [
+                    'rgba(220, 53, 69, 0.6)',  // 0-4
+                    'rgba(255, 193, 7, 0.6)',   // 4-8
+                    'rgba(108, 117, 125, 0.6)', // 8-10
+                    'rgba(0, 123, 255, 0.6)',   // 10-12
+                    'rgba(40, 167, 69, 0.6)',   // 12-14
+                    'rgba(23, 162, 184, 0.6)',  // 14-16
+                    'rgba(111, 66, 193, 0.6)'   // 16-20
+                ],
+                borderColor: [
+                    'rgba(220, 53, 69, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(108, 117, 125, 1)',
+                    'rgba(0, 123, 255, 1)',
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(23, 162, 184, 1)',
+                    'rgba(111, 66, 193, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Nombre d\'élèves'
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+
+function resetFilters() {
+    document.getElementById('niveau').value = '';
+    document.getElementById('classe').value = '';
+    document.getElementById('import').value = '';
+    document.getElementById('discipline').value = '';
+    document.getElementById('sexe').value = '';
+    document.getElementById('filtres-form').submit();
+}
+
+function exportTableToCSV() {
+    const table = document.getElementById('notes-table');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = [], cols = rows[i].querySelectorAll('td, th');
+        
+        for (let j = 0; j < cols.length; j++) {
+            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/"/g, '""');
+            row.push('"' + data + '"');
+        }
+        
+        csv.push(row.join(','));
+    }
+    
+    const csvFile = new Blob([csv.join('\n')], {type: 'text/csv'});
+    const downloadLink = document.createElement('a');
+    
+    downloadLink.download = 'Notes_Discipline_{{ selected_discipline }}.csv';
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = 'none';
+    
+    document.body.appendChild(downloadLink.click();
+    document.body.removeChild(downloadLink);
+}
+
+function printTable() {
+    const printContents = document.getElementById('notes-table').outerHTML;
+    const originalContents = document.body.innerHTML;
+    
+    document.body.innerHTML = `
+        <html>
+            <head>
+                <title>Notes de {{ selected_discipline }}</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 20px; }
+                    h1 { font-size: 18px; margin-bottom: 10px; }
+                    .print-header { margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>Notes de {{ selected_discipline }} - Semestre 1</h1>
+                    <p>Année scolaire : {{ etablissement.annee_scolaire_active }}</p>
+                    <p>Date d'impression : ${new Date().toLocaleDateString()}</p>
+                    <hr>
+                </div>
+                ${printContents}
+            </body>
+        </html>
+    `;
+    
+    window.print();
+    document.body.innerHTML = originalContents;
+    
+    // Réinitialiser les fonctionnalités JavaScript
+    $(document).ready(function() {
+        $('#notes-table').DataTable({
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+            },
+            responsive: true,
+            order: [[3, 'desc']],
+            pageLength: 25
+        });
+    });
+}
+</script>
+{% endblock %}

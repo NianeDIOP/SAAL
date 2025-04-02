@@ -13,6 +13,10 @@
                 {% if '/semestre1/analyse-moyennes/' in request.path %}active{% endif %}">
                 <i class="fas fa-chart-line me-2"></i>Analyse des moyennes
             </a>
+            <a href="{% url 'core:semestre1_analyse_disciplines' %}" class="list-group-item list-group-item-action
+                {% if '/semestre1/analyse-disciplines/' in request.path %}active{% endif %}">
+                <i class="fas fa-book-open me-2"></i>Analyse des disciplines
+            </a>
             <a href="{% url 'core:semestre1_importation' %}" class="list-group-item list-group-item-action
                 {% if '/semestre1/importation/' in request.path %}active{% endif %}">
                 <i class="fas fa-file-import me-2"></i>Importation

@@ -40,6 +40,8 @@ class Classe(models.Model):
     class Meta:
         ordering = ['niveau__ordre', 'nom']
 
+from django.db import models
+
 class ImportFichier(models.Model):
     SEMESTRE_CHOICES = [
         (1, 'Semestre 1'),
@@ -58,6 +60,9 @@ class ImportFichier(models.Model):
     statut = models.CharField(max_length=10, choices=STATUS_CHOICES, default='en_cours')
     erreur_message = models.TextField(blank=True, null=True)
     annee_scolaire = models.CharField(max_length=10)
+    
+    # Nouveau champ pour stocker des données supplémentaires
+    donnees_supplementaires = models.JSONField(blank=True, null=True, default=dict)
     
     def __str__(self):
         return f"{self.titre} (Semestre {self.semestre}, {self.statut})"
@@ -141,6 +146,7 @@ class DonneesMoyennesEleves(models.Model):
         ordering = ['-moyenne_generale']
         verbose_name = "Données moyennes élèves"
         verbose_name_plural = "Données moyennes élèves"
+# Dans core/models.py
 class DonneesDetailleesEleves(models.Model):
     """Stockage des données du tableau 'Données détaillées'"""
     import_fichier = models.ForeignKey(ImportFichier, on_delete=models.CASCADE, related_name='donnees_detaillees')
@@ -153,6 +159,45 @@ class DonneesDetailleesEleves(models.Model):
     def __str__(self):
         return f"{self.nom} {self.prenom or ''}"
     
-    class Meta:
-        verbose_name = "Données détaillées élèves"
-        verbose_name_plural = "Données détaillées élèves"
+    def get_moyennes_disciplines(self):
+        """
+        Retourne un dictionnaire avec uniquement les moyennes par discipline
+        """
+        return {
+            discipline: float(valeur) 
+            for discipline, valeur in self.disciplines.items() 
+            if discipline.endswith('Moy D') and valeur not in ['', None]
+        }
+    
+    def get_notes_disciplines(self):
+        """
+        Retourne un dictionnaire avec les notes par discipline, excluant les moyennes
+        """
+        return {
+            discipline: valeur 
+            for discipline, valeur in self.disciplines.items() 
+            if not discipline.endswith('Moy D') and valeur not in ['', None]
+        }
+    
+    @classmethod
+    def get_disciplines_disponibles(cls, import_fichier):
+        """
+        Récupère la liste unique des disciplines pour un import donné
+        """
+        # Extraire les noms de discipline sans le suffixe "Moy D"
+        disciplines_raw = cls.objects.filter(import_fichier=import_fichier).values_list('disciplines', flat=True)
+        
+        # Extraire les clés
+        toutes_disciplines = []
+        for discipline_dict in disciplines_raw:
+            if isinstance(discipline_dict, dict):
+                toutes_disciplines.extend(discipline_dict.keys())
+        
+        # Filtrer et garder uniquement les disciplines (pas les moyennes)
+        disciplines = set(
+            discipline.replace(' Moy D', '') 
+            for discipline in toutes_disciplines 
+            if not discipline.endswith('Moy D')
+        )
+        
+        return sorted(list(disciplines))
