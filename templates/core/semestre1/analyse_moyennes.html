@@ -1,0 +1,100 @@
+{% extends 'core/semestre1/base_semestre1.html' %}
+
+{% block title %}SAAL - Analyse des moyennes - Semestre 1{% endblock %}
+
+{% block semestre1_title %}Analyse des moyennes - Semestre 1{% endblock %}
+{% block semestre1_subtitle %}
+    Année scolaire {{ etablissement.annee_scolaire_active }}
+{% endblock %}
+
+{% block semestre1_content %}
+<!-- Filtres -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0 text-primary"><i class="fas fa-filter me-2"></i>Filtres</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" id="filtres-form" class="row g-3">
+            <div class="col-md-4">
+                <label for="niveau" class="form-label">Niveau</label>
+                <select class="form-select" id="niveau" name="niveau" onchange="this.form.submit()">
+                    <option value="">Tous les niveaux</option>
+                    {% for niveau in niveaux %}
+                    <option value="{{ niveau.id }}" {% if selected_niveau == niveau.id|stringformat:"s" %}selected{% endif %}>
+                        {{ niveau.nom }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="classe" class="form-label">Classe</label>
+                <select class="form-select" id="classe" name="classe" onchange="this.form.submit()">
+                    <option value="">Toutes les classes</option>
+                    {% for classe in classes %}
+                    <option value="{{ classe.id }}" {% if selected_classe == classe.id|stringformat:"s" %}selected{% endif %}>
+                        {{ classe.nom }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="import" class="form-label">Importation</label>
+                <select class="form-select" id="import" name="import" onchange="this.form.submit()">
+                    <option value="">Toutes les importations</option>
+                    {% for import in imports %}
+                    <option value="{{ import.id }}" {% if selected_import == import.id|stringformat:"s" %}selected{% endif %}>
+                        {{ import.titre }} ({{ import.date_import|date:"d/m/Y" }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()">
+                    <i class="fas fa-times me-2"></i>Réinitialiser les filtres
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if stats %}
+<!-- Statistiques générales -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-primary"><i class="fas fa-chart-pie me-2"></i>Statistiques générales</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center g-3">
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6 class="text-muted">Nombre d'élèves</h6>
+                            <h2 class="display-6 fw-bold text-primary mb-0">{{ stats.nb_eleves }}</h2>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6 class="text-muted">Moyenne générale</h6>
+                            <h2 class="display-6 fw-bold text-primary mb-0">{{ stats.moyenne_globale|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6 class="text-muted">Moyenne min</h6>
+                            <h3 class="fw-bold text-danger mb-0">{{ stats.min_moyenne|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <h6 class="text-muted">Moyenne max</h6>
+                            <h3 class="fw-bold text-success mb-0">{{ stats.max_moyenne|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

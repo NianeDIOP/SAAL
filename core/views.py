@@ -351,3 +351,85 @@ def semestre1_importation_delete(request, import_id):
     }
     
     return render(request, 'core/semestre1/importation_delete.html', context)
+
+def semestre1_analyse_moyennes(request):
+    """
+    Vue pour l'analyse des moyennes du Semestre 1
+    """
+    # Récupérer l'établissement et l'année scolaire active
+    etablissement = Etablissement.objects.first()
+    annee_scolaire = etablissement.annee_scolaire_active if etablissement else "2024-2025"
+    
+    # Récupérer toutes les classes et niveaux pour les filtres
+    classes = Classe.objects.filter(annee_scolaire=annee_scolaire)
+    niveaux = Niveau.objects.all()
+    
+    # Récupérer tous les imports terminés pour le semestre 1
+    imports = ImportFichier.objects.filter(
+        semestre=1, 
+        annee_scolaire=annee_scolaire,
+        statut='termine'
+    )
+    
+    # Filtres
+    classe_id = request.GET.get('classe')
+    niveau_id = request.GET.get('niveau')
+    import_id = request.GET.get('import')
+    
+    # Construire la requête de base
+    moyennes_query = MoyenneEleve.objects.filter(
+        import_fichier__semestre=1,
+        import_fichier__annee_scolaire=annee_scolaire,
+        import_fichier__statut='termine'
+    ).select_related('classe', 'import_fichier')
+    
+    # Appliquer les filtres
+    if classe_id:
+        moyennes_query = moyennes_query.filter(classe_id=classe_id)
+    
+    if niveau_id:
+        moyennes_query = moyennes_query.filter(classe__niveau_id=niveau_id)
+    
+    if import_id:
+        moyennes_query = moyennes_query.filter(import_fichier_id=import_id)
+    
+    # Ordonner par moyenne générale décroissante
+    moyennes = moyennes_query.order_by('-moyenne_generale')
+    
+    # Statistiques générales
+    stats = {}
+    if moyennes.exists():
+        from django.db.models import Avg, Min, Max, Count
+        
+        stats['nb_eleves'] = moyennes.count()
+        stats['moyenne_globale'] = moyennes.aggregate(Avg('moyenne_generale'))['moyenne_generale__avg']
+        stats['min_moyenne'] = moyennes.aggregate(Min('moyenne_generale'))['moyenne_generale__min']
+        stats['max_moyenne'] = moyennes.aggregate(Max('moyenne_generale'))['moyenne_generale__max']
+        
+        # Répartition des moyennes
+        repartition = {
+            'excellence': moyennes.filter(moyenne_generale__gte=16).count(),
+            'tres_bien': moyennes.filter(moyenne_generale__gte=14, moyenne_generale__lt=16).count(),
+            'bien': moyennes.filter(moyenne_generale__gte=12, moyenne_generale__lt=14).count(),
+            'assez_bien': moyennes.filter(moyenne_generale__gte=10, moyenne_generale__lt=12).count(),
+            'passable': moyennes.filter(moyenne_generale__gte=8, moyenne_generale__lt=10).count(),
+            'insuffisant': moyennes.filter(moyenne_generale__lt=8).count(),
+        }
+        stats['repartition'] = repartition
+        
+        # Top 5 des élèves
+        stats['top_eleves'] = moyennes[:5]
+    
+    context = {
+        'etablissement': etablissement,
+        'classes': classes,
+        'niveaux': niveaux,
+        'imports': imports,
+        'moyennes': moyennes,
+        'stats': stats,
+        'selected_classe': classe_id,
+        'selected_niveau': niveau_id,
+        'selected_import': import_id,
+    }
+    
+    return render(request, 'core/semestre1/analyse_moyennes.html', context)

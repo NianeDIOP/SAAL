@@ -12,4 +12,5 @@ urlpatterns = [
     path('semestre1/importation/', views.semestre1_importation, name='semestre1_importation'),
     path('semestre1/importation/<int:import_id>/', views.semestre1_importation_detail, name='semestre1_importation_detail'),
     path('semestre1/importation/<int:import_id>/delete/', views.semestre1_importation_delete, name='semestre1_importation_delete'),
+    path('semestre1/analyse-moyennes/', views.semestre1_analyse_moyennes, name='semestre1_analyse_moyennes'),
 ]

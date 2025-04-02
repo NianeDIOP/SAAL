@@ -9,3 +9,11 @@ def get_item(dictionary, key):
     if not dictionary:
         return None
     return dictionary.get(key)
+
+@register.filter
+def div(value, arg):
+    """Divise la valeur par l'argument"""
+    try:
+        return float(value) * 100 / float(arg)
+    except (ValueError, ZeroDivisionError):
+        return 0
