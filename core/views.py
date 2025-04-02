@@ -155,6 +155,13 @@ def semestre1_importation(request):
             import pandas as pd
             import json
             
+            # Récupérer la classe sélectionnée si une est choisie
+            classe_selectionnee = None
+            niveau_selectionne = None
+            if classe_id:
+                classe_selectionnee = Classe.objects.get(id=classe_id)
+                niveau_selectionne = classe_selectionnee.niveau
+            
             xls = pd.ExcelFile(fichier_excel)
             
             # --- 1) Lecture de l'onglet "Moyennes eleves"
@@ -215,13 +222,16 @@ def semestre1_importation(request):
                 
                 # Chercher la moyenne générale dans différentes colonnes possibles
                 moyenne_generale = None
-                for col in ['Moyenne Générale', 'Moyenne générale', 'Moyenne Generale', 'Moyenne', 'Moy Gen']:
+                for col in ['Moyenne Générale', 'Moyenne générale', 'Moyenne Generale', 'Moyenne', 'Moy Gen', 'Moy']:
                     if col in df_moyennes.columns and pd.notna(row.get(col)):
-                        moyenne_generale = float(row.get(col))
-                        break
+                        try:
+                            # Conserver la valeur exacte
+                            moyenne_generale = float(row.get(col))
+                            print(f"Moyenne trouvée: {moyenne_generale} dans la colonne {col}")
+                            break
+                        except (ValueError, TypeError) as e:
+                            print(f"Erreur lors de la conversion de {row.get(col)}: {e}")
                 
-                # Chercher le rang
-                # Dans la partie où vous cherchez le rang et l'effectif
                 # Chercher le rang
                 rang = None
                 for col in ['Rang', 'rang', 'Rang Classe', 'rang classe']:
@@ -264,6 +274,22 @@ def semestre1_importation(request):
                             if hasattr(val, 'item'):  # Pour les types numpy
                                 val = val.item()
                             donnees_additionnelles[col] = val
+
+                # IMPORTANT: Trouver la classe correspondante dans la base de données
+                classe_obj = None
+                niveau_obj = None
+                
+                # Si classe_selectionnee existe, l'utiliser directement
+                if classe_selectionnee:
+                    classe_obj = classe_selectionnee
+                    niveau_obj = niveau_selectionne
+                # Sinon, chercher parmi les classes existantes
+                elif classe_nom:
+                    for c in classes:
+                        if c.nom.lower() in classe_nom.lower() or classe_nom.lower() in c.nom.lower():
+                            classe_obj = c
+                            niveau_obj = c.niveau
+                            break
                 
                 # Sauvegarder dans la base de données
                 if nom:  # S'assurer qu'il y a un nom
@@ -271,7 +297,9 @@ def semestre1_importation(request):
                         import_fichier=import_fichier,
                         nom=nom,
                         prenom=prenom,
-                        classe=classe_nom,
+                        classe_texte=classe_nom,
+                        classe_obj=classe_obj,
+                        niveau=niveau_obj,
                         moyenne_generale=moyenne_generale,
                         rang_classe=rang,
                         effectif_classe=effectif,
@@ -304,74 +332,7 @@ def semestre1_importation(request):
                         disciplines=disciplines_dict
                     )
             
-            # Continuer avec le code existant pour MoyenneEleve et MoyenneDiscipline
-            if classe_id:
-                classe = Classe.objects.get(id=classe_id)
-                
-                # Parcourir les données nettoyées et créer des enregistrements
-                for index, row in df_final.iterrows():
-                    nom = str(row.get('Nom', ''))
-                    prenom = str(row.get('Prénom', '')) if pd.notna(row.get('Prénom')) else None
-                    
-                    if nom:  # S'assurer qu'il y a un nom avant de créer un enregistrement
-                        # Chercher la moyenne générale dans les données stockées
-                        moyenne_generale = 0
-                        
-                        # Chercher dans les DonneesMoyennesEleves
-                        if prenom:
-                            donnees_eleve = DonneesMoyennesEleves.objects.filter(
-                                import_fichier=import_fichier, 
-                                nom=nom, 
-                                prenom=prenom
-                            ).first()
-                        else:
-                            donnees_eleve = DonneesMoyennesEleves.objects.filter(
-                                import_fichier=import_fichier, 
-                                nom=nom
-                            ).first()
-                        
-                        if donnees_eleve and donnees_eleve.moyenne_generale:
-                            moyenne_generale = donnees_eleve.moyenne_generale
-                        else:
-                            # Calculer la moyenne générale à partir des moyennes par discipline
-                            moyennes_disciplinaires = []
-                            
-                            for col in df_final.columns:
-                                if col not in ['Nom', 'Prénom', 'Classe']:
-                                    val = row.get(col)
-                                    if pd.notna(val) and isinstance(val, (int, float)):
-                                        moyennes_disciplinaires.append(val)
-                            
-                            moyenne_generale = sum(moyennes_disciplinaires) / len(moyennes_disciplinaires) if moyennes_disciplinaires else 0
-                        
-                        # Créer l'enregistrement de moyenne générale
-                        eleve = MoyenneEleve.objects.create(
-                            import_fichier=import_fichier,
-                            nom_eleve=nom,
-                            prenom_eleve=prenom,
-                            classe=classe,
-                            moyenne_generale=moyenne_generale,
-                            rang=0  # Rang à calculer ultérieurement
-                        )
-                        
-                        # Créer les enregistrements de moyennes par discipline
-                        for col in df_final.columns:
-                            if col not in ['Nom', 'Prénom', 'Classe']:
-                                val = row.get(col)
-                                if pd.notna(val) and isinstance(val, (int, float)):
-                                    MoyenneDiscipline.objects.create(
-                                        eleve=eleve,
-                                        nom_discipline=col,
-                                        moyenne=val
-                                    )
-                
-                # Calculer et mettre à jour les rangs
-                # Trier les élèves par moyenne décroissante
-                eleves_tries = MoyenneEleve.objects.filter(import_fichier=import_fichier, classe=classe).order_by('-moyenne_generale')
-                for i, eleve in enumerate(eleves_tries):
-                    eleve.rang = i + 1
-                    eleve.save()
-            
+            # Terminer l'importation
             import_fichier.statut = 'termine'
             import_fichier.save()
             messages.success(request, "Le fichier a été importé et nettoyé avec succès.")
@@ -533,8 +494,10 @@ def semestre1_analyse_moyennes(request):
     classe_id = request.GET.get('classe')
     niveau_id = request.GET.get('niveau')
     import_id = request.GET.get('import')
+    sexe = request.GET.get('sexe')
+    intervalle = request.GET.get('intervalle')
     
-    # Récupérer les données de "Moyennes eleves" stockées
+    # Base de requête pour les données de moyenne
     donnees_moyennes_query = DonneesMoyennesEleves.objects.filter(
         import_fichier__semestre=1,
         import_fichier__annee_scolaire=annee_scolaire,
@@ -545,53 +508,108 @@ def semestre1_analyse_moyennes(request):
     if import_id:
         donnees_moyennes_query = donnees_moyennes_query.filter(import_fichier_id=import_id)
     
-    # Construire la requête MoyenneEleve (pour avoir le lien avec la classe)
-    moyennes_query = MoyenneEleve.objects.filter(
-        import_fichier__semestre=1,
-        import_fichier__annee_scolaire=annee_scolaire,
-        import_fichier__statut='termine'
-    ).select_related('classe', 'import_fichier')
-    
     if classe_id:
-        moyennes_query = moyennes_query.filter(classe_id=classe_id)
-        # Filtrer donnees_moyennes par correspondance de noms
-        noms_eleves = moyennes_query.values_list('nom_eleve', flat=True)
-        donnees_moyennes_query = donnees_moyennes_query.filter(nom__in=noms_eleves)
+        donnees_moyennes_query = donnees_moyennes_query.filter(classe_obj_id=classe_id)
     
     if niveau_id:
-        moyennes_query = moyennes_query.filter(classe__niveau_id=niveau_id)
-        # Filtrer donnees_moyennes par correspondance de noms
-        noms_eleves = moyennes_query.values_list('nom_eleve', flat=True)
-        donnees_moyennes_query = donnees_moyennes_query.filter(nom__in=noms_eleves)
+        donnees_moyennes_query = donnees_moyennes_query.filter(niveau_id=niveau_id)
     
-    if import_id:
-        moyennes_query = moyennes_query.filter(import_fichier_id=import_id)
+    # Filtrer par sexe
+    if sexe:
+        from django.db.models import Q
+        sexe_filter = Q()
+        
+        if sexe == 'M':
+            # Chercher les valeurs qui commencent par M ou H
+            sexe_filter |= Q(donnees_additionnelles__Sexe__istartswith='M')
+            sexe_filter |= Q(donnees_additionnelles__Sexe__istartswith='H')
+            sexe_filter |= Q(donnees_additionnelles__sexe__istartswith='M')
+            sexe_filter |= Q(donnees_additionnelles__sexe__istartswith='H')
+            sexe_filter |= Q(donnees_additionnelles__Genre__istartswith='M')
+            sexe_filter |= Q(donnees_additionnelles__Genre__istartswith='H')
+        else:  # sexe == 'F'
+            # Pour féminin, chercher les valeurs qui commencent par F
+            sexe_filter |= Q(donnees_additionnelles__Sexe__istartswith='F')
+            sexe_filter |= Q(donnees_additionnelles__sexe__istartswith='F')
+            sexe_filter |= Q(donnees_additionnelles__Genre__istartswith='F')
+        
+        donnees_moyennes_query = donnees_moyennes_query.filter(sexe_filter)
     
-    # Ordonner les résultats
-    moyennes = moyennes_query.order_by('-moyenne_generale')
-    donnees_moyennes = list(donnees_moyennes_query)
+    # Initialiser donnees_moyennes comme une liste vide par défaut
+    donnees_moyennes = []
+    
+    # Convertir en liste uniquement si des résultats existent
+    if donnees_moyennes_query.exists():
+        donnees_moyennes = list(donnees_moyennes_query)
+    
+    # Filtre par intervalle de moyenne
+    if intervalle and donnees_moyennes:
+        filtered_by_interval = []
+        for d in donnees_moyennes:
+            if d.moyenne_generale is not None:
+                try:
+                    moyenne = float(d.moyenne_generale)
+                    if intervalle == 'excellence' and moyenne >= 16:
+                        filtered_by_interval.append(d)
+                    elif intervalle == 'tres_bien' and 14 <= moyenne < 16:
+                        filtered_by_interval.append(d)
+                    elif intervalle == 'bien' and 12 <= moyenne < 14:
+                        filtered_by_interval.append(d)
+                    elif intervalle == 'assez_bien' and 10 <= moyenne < 12:
+                        filtered_by_interval.append(d)
+                    elif intervalle == 'passable' and 8 <= moyenne < 10:
+                        filtered_by_interval.append(d)
+                    elif intervalle == 'insuffisant' and moyenne < 8:
+                        filtered_by_interval.append(d)
+                except (ValueError, TypeError):
+                    pass
+        
+        donnees_moyennes = filtered_by_interval
+    
+    # Trier par moyenne générale décroissante
+    donnees_moyennes.sort(
+        key=lambda x: float(x.moyenne_generale) if x.moyenne_generale is not None else 0,
+        reverse=True
+    )
     
     # Statistiques générales
     stats = {}
     
     if donnees_moyennes:
-        from django.db.models import Avg, Min, Max, Count, Sum, Q
-        import pandas as pd
-        import json
-        
         # 1. Statistiques de base
         total_eleves = len(donnees_moyennes)
         stats['nb_eleves'] = total_eleves
         
-        # Calculer le nombre par sexe (si disponible)
-        stats['sexe'] = {
-            'M': 0,
-            'F': 0,
-            'non_precise': 0
-        }
+        # Compter par sexe
+        stats['sexe'] = {'M': 0, 'F': 0, 'non_precise': 0}
         
-        # Calculer les moyennes
-        moyennes_values = [d.moyenne_generale for d in donnees_moyennes if d.moyenne_generale is not None]
+        for d in donnees_moyennes:
+            sexe_trouve = False
+            if d.donnees_additionnelles:
+                for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                    if key in d.donnees_additionnelles:
+                        valeur = str(d.donnees_additionnelles[key]).upper()
+                        if valeur.startswith('M') or valeur.startswith('H'):
+                            stats['sexe']['M'] += 1
+                            sexe_trouve = True
+                            break
+                        elif valeur.startswith('F'):
+                            stats['sexe']['F'] += 1
+                            sexe_trouve = True
+                            break
+            
+            if not sexe_trouve:
+                stats['sexe']['non_precise'] += 1
+        
+        # 2. Moyennes
+        moyennes_values = []
+        for d in donnees_moyennes:
+            if d.moyenne_generale is not None:
+                try:
+                    moyennes_values.append(float(d.moyenne_generale))
+                except (ValueError, TypeError):
+                    pass
+        
         if moyennes_values:
             stats['moyenne_globale'] = sum(moyennes_values) / len(moyennes_values)
             stats['min_moyenne'] = min(moyennes_values)
@@ -601,7 +619,7 @@ def semestre1_analyse_moyennes(request):
             stats['min_moyenne'] = 0
             stats['max_moyenne'] = 0
         
-        # 2. Répartition des moyennes
+        # 3. Répartition des moyennes
         repartition = {
             'excellence': 0,
             'tres_bien': 0,
@@ -613,22 +631,26 @@ def semestre1_analyse_moyennes(request):
         
         for d in donnees_moyennes:
             if d.moyenne_generale is not None:
-                if d.moyenne_generale >= 16:
-                    repartition['excellence'] += 1
-                elif d.moyenne_generale >= 14:
-                    repartition['tres_bien'] += 1
-                elif d.moyenne_generale >= 12:
-                    repartition['bien'] += 1
-                elif d.moyenne_generale >= 10:
-                    repartition['assez_bien'] += 1
-                elif d.moyenne_generale >= 8:
-                    repartition['passable'] += 1
-                else:
-                    repartition['insuffisant'] += 1
+                try:
+                    moyenne = float(d.moyenne_generale)
+                    if moyenne >= 16:
+                        repartition['excellence'] += 1
+                    elif moyenne >= 14:
+                        repartition['tres_bien'] += 1
+                    elif moyenne >= 12:
+                        repartition['bien'] += 1
+                    elif moyenne >= 10:
+                        repartition['assez_bien'] += 1
+                    elif moyenne >= 8:
+                        repartition['passable'] += 1
+                    else:
+                        repartition['insuffisant'] += 1
+                except (ValueError, TypeError):
+                    pass
         
         stats['repartition'] = repartition
         
-        # Calculer les pourcentages pour les barres de progression
+        # Calcul des pourcentages
         pourcentages = {}
         if total_eleves > 0:
             for categorie, nombre in repartition.items():
@@ -638,117 +660,156 @@ def semestre1_analyse_moyennes(request):
         
         stats['pourcentages'] = pourcentages
         
-        # 3. Taux de réussite
-        eleves_reussite = sum(1 for d in donnees_moyennes if d.moyenne_generale is not None and d.moyenne_generale >= 10)
+        # 4. Taux de réussite
+        eleves_reussite = {'total': 0, 'par_sexe': {'M': 0, 'F': 0}}
+        
+        for d in donnees_moyennes:
+            if d.moyenne_generale is not None:
+                try:
+                    if float(d.moyenne_generale) >= 10:
+                        eleves_reussite['total'] += 1
+                        
+                        # Répartition par sexe
+                        if d.donnees_additionnelles:
+                            for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                                if key in d.donnees_additionnelles:
+                                    valeur = str(d.donnees_additionnelles[key]).upper()
+                                    if valeur.startswith('M') or valeur.startswith('H'):
+                                        eleves_reussite['par_sexe']['M'] += 1
+                                        break
+                                    elif valeur.startswith('F'):
+                                        eleves_reussite['par_sexe']['F'] += 1
+                                        break
+                except (ValueError, TypeError):
+                    pass
+        
         stats['taux_reussite'] = {
-            'nombre': eleves_reussite,
-            'pourcentage': (eleves_reussite / total_eleves * 100) if total_eleves > 0 else 0
+            'nombre': eleves_reussite['total'],
+            'pourcentage': (eleves_reussite['total'] / total_eleves * 100) if total_eleves > 0 else 0,
+            'par_sexe': eleves_reussite['par_sexe']
         }
         
-        # 4. Extraire les informations supplémentaires des données
-        # (absences, retards, appréciations, etc.)
-        stats['absences'] = {
-            'total': 0,
-            'moyenne': 0
-        }
-        
-        stats['retards'] = {
-            'total': 0,
-            'moyenne': 0
-        }
-        
+        # 5. Extraire informations supplémentaires
+        stats['absences'] = {'total': 0, 'moyenne': 0, 'max': 0}
+        stats['retards'] = {'total': 0, 'moyenne': 0, 'max': 0}
         stats['appreciations'] = {}
         stats['decisions'] = {}
         
         for d in donnees_moyennes:
             if d.donnees_additionnelles:
-                # Chercher les absences
-                for key in ['Absences', 'absences', 'Abs', 'abs', 'Heures absences', 'Total absences']:
-                    if key in d.donnees_additionnelles:
+                # Chercher absences
+                for key in ['Absences', 'absences', 'Absence', 'absence']:
+                    if key in d.donnees_additionnelles and d.donnees_additionnelles[key]:
                         try:
-                            abs_val = float(d.donnees_additionnelles[key])
-                            stats['absences']['total'] += abs_val
+                            val = str(d.donnees_additionnelles[key])
+                            # Pour le format "Abs: 4 Jstf: 0"
+                            if 'Abs:' in val:
+                                parts = val.split('Abs:')
+                                if len(parts) > 1:
+                                    abs_part = parts[1].strip().split()[0]
+                                    abs_val = float(abs_part)
+                                    stats['absences']['total'] += abs_val
+                                    stats['absences']['max'] = max(stats['absences']['max'], abs_val)
+                            else:
+                                abs_val = float(val)
+                                stats['absences']['total'] += abs_val
+                                stats['absences']['max'] = max(stats['absences']['max'], abs_val)
                         except (ValueError, TypeError):
                             pass
                 
-                # Chercher les retards
-                for key in ['Retards', 'retards', 'Ret', 'ret', 'Total retards']:
-                    if key in d.donnees_additionnelles:
+                # Chercher retards
+                for key in ['Retards', 'retards', 'Retard', 'retard']:
+                    if key in d.donnees_additionnelles and d.donnees_additionnelles[key]:
                         try:
-                            ret_val = float(d.donnees_additionnelles[key])
-                            stats['retards']['total'] += ret_val
+                            val = d.donnees_additionnelles[key]
+                            # Pour le format "0h 0mn"
+                            if isinstance(val, str) and 'h' in val:
+                                parts = val.split('h')
+                                hours = int(parts[0])
+                                minutes = 0
+                                if len(parts) > 1 and 'mn' in parts[1]:
+                                    try:
+                                        minutes = int(parts[1].split('mn')[0])
+                                    except ValueError:
+                                        pass
+                                # Convertir en minutes
+                                ret_val = hours * 60 + minutes
+                                if ret_val > 0:  # Ne compter que si > 0
+                                    stats['retards']['total'] += 1
+                                    stats['retards']['max'] = max(stats['retards']['max'], 1)
+                            else:
+                                ret_val = float(val) if not isinstance(val, str) else 1
+                                stats['retards']['total'] += ret_val
+                                stats['retards']['max'] = max(stats['retards']['max'], ret_val)
                         except (ValueError, TypeError):
                             pass
                 
-                # Chercher les appréciations
-                for key in ['Appréciation', 'Appreciation', 'appreciation', 'Mention', 'mention']:
-                    if key in d.donnees_additionnelles:
+                # Chercher appréciations
+                for key in ['Appréciation', 'Appreciation', 'appreciation']:
+                    if key in d.donnees_additionnelles and d.donnees_additionnelles[key]:
                         appreciation = str(d.donnees_additionnelles[key])
-                        if appreciation:
-                            stats['appreciations'][appreciation] = stats['appreciations'].get(appreciation, 0) + 1
+                        stats['appreciations'][appreciation] = stats['appreciations'].get(appreciation, 0) + 1
                 
-                # Chercher les décisions du conseil
-                for key in ['Décision', 'Decision', 'decision', 'Conseil', 'conseil', 'Avis']:
-                    if key in d.donnees_additionnelles:
+                # Chercher décisions du conseil
+                for key in ['Décision conseil', 'Décision du conseil', 'Décision', 'Decision']:
+                    if key in d.donnees_additionnelles and d.donnees_additionnelles[key]:
                         decision = str(d.donnees_additionnelles[key])
-                        if decision:
-                            stats['decisions'][decision] = stats['decisions'].get(decision, 0) + 1
-                
-                # Chercher le sexe
-                for key in ['Sexe', 'sexe', 'Genre', 'genre']:
-                    if key in d.donnees_additionnelles:
-                        sexe = str(d.donnees_additionnelles[key]).upper()
-                        if sexe == 'M' or sexe == 'MASCULIN' or sexe == 'H':
-                            stats['sexe']['M'] += 1
-                        elif sexe == 'F' or sexe == 'FEMININ' or sexe == 'FÉMININ':
-                            stats['sexe']['F'] += 1
-                        else:
-                            stats['sexe']['non_precise'] += 1
+                        stats['decisions'][decision] = stats['decisions'].get(decision, 0) + 1
         
-        # Calculer les moyennes d'absences et retards
+        # Calculer moyennes d'absences et retards
         if total_eleves > 0:
             stats['absences']['moyenne'] = stats['absences']['total'] / total_eleves
             stats['retards']['moyenne'] = stats['retards']['total'] / total_eleves
         
-        # 5. Données pour les graphiques
-        # Moyenne par niveau (si applicable)
-        if niveau_id is None:
-            moyennes_par_niveau = {}
-            niveaux_dict = {n.id: n.nom for n in niveaux}
-            
-            for eleve in moyennes:
-                niveau_id = eleve.classe.niveau.id
-                niveau_nom = niveaux_dict.get(niveau_id, "Non défini")
+        # 6. Moyennes par niveau (utiliser les relations directes maintenant)
+        moyennes_par_niveau = {}
+        
+        # Regrouper par niveau
+        for d in donnees_moyennes:
+            if d.niveau and d.moyenne_generale is not None:
+                niveau_nom = d.niveau.nom
                 
                 if niveau_nom not in moyennes_par_niveau:
                     moyennes_par_niveau[niveau_nom] = {'somme': 0, 'count': 0}
                 
-                moyennes_par_niveau[niveau_nom]['somme'] += eleve.moyenne_generale
-                moyennes_par_niveau[niveau_nom]['count'] += 1
-            
-            stats['moyennes_par_niveau'] = {
-                'labels': [],
-                'data': []
-            }
-            
-            for niveau, values in moyennes_par_niveau.items():
+                try:
+                    moyenne = float(d.moyenne_generale)
+                    moyennes_par_niveau[niveau_nom]['somme'] += moyenne
+                    moyennes_par_niveau[niveau_nom]['count'] += 1
+                except (ValueError, TypeError):
+                    pass
+        
+        stats['moyennes_par_niveau'] = {
+            'labels': [],
+            'data': []
+        }
+        
+        for niveau, values in moyennes_par_niveau.items():
+            if values['count'] > 0:
                 stats['moyennes_par_niveau']['labels'].append(niveau)
-                moy = values['somme'] / values['count'] if values['count'] > 0 else 0
+                moy = values['somme'] / values['count']
                 stats['moyennes_par_niveau']['data'].append(round(moy, 2))
         
-        # 6. Top 5 des élèves
-        stats['top_eleves'] = moyennes[:5]
+        # 7. Top 5 des élèves
+        top_eleves = donnees_moyennes[:5] if len(donnees_moyennes) >= 5 else donnees_moyennes
+        
+        # Ajouter rang pour affichage
+        for i, d in enumerate(top_eleves):
+            d.rang = i + 1
+            stats['top_eleves'] = top_eleves
     
     context = {
         'etablissement': etablissement,
         'classes': classes,
         'niveaux': niveaux,
         'imports': imports,
-        'moyennes': moyennes,
+        'moyennes': donnees_moyennes,
         'stats': stats,
         'selected_classe': classe_id,
         'selected_niveau': niveau_id,
         'selected_import': import_id,
+        'selected_sexe': sexe,
+        'selected_intervalle': intervalle,
     }
     
     return render(request, 'core/semestre1/analyse_moyennes.html', context)

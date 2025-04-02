@@ -83,9 +83,14 @@ class MoyenneEleve(models.Model):
         if self.moyenne_generale is None:
             return "0.00"
         try:
-            # Forcer la conversion en float et formater à 2 décimales
-            return "{:.2f}".format(float(self.moyenne_generale))
-        except (ValueError, TypeError):
+            # Convertir correctement la valeur en float
+            moyenne_value = self.moyenne_generale
+            if isinstance(moyenne_value, str):
+                # Remplacer la virgule par un point si nécessaire
+                moyenne_value = moyenne_value.replace(',', '.')
+            return "{:.2f}".format(float(moyenne_value))
+        except (ValueError, TypeError) as e:
+            print(f"Erreur lors du formatage de la moyenne '{self.moyenne_generale}': {e}")
             return "0.00"
     
     def get_nom_complet(self):
@@ -115,18 +120,18 @@ class MoyenneDiscipline(models.Model):
     
     # Ajoutez ceci à models.py
 
+# Dans core/models.py, modifiez la classe DonneesMoyennesEleves
 class DonneesMoyennesEleves(models.Model):
     """Stockage des données du tableau 'Moyennes eleves'"""
     import_fichier = models.ForeignKey(ImportFichier, on_delete=models.CASCADE, related_name='donnees_moyennes')
     nom = models.CharField(max_length=100)
     prenom = models.CharField(max_length=100, blank=True, null=True)
-    classe = models.CharField(max_length=50, blank=True, null=True)
+    classe_texte = models.CharField(max_length=50, blank=True, null=True)  # Nom de classe en texte
+    classe_obj = models.ForeignKey(Classe, on_delete=models.SET_NULL, null=True, blank=True, related_name='donnees_moyennes')  # Relation avec Classe
+    niveau = models.ForeignKey(Niveau, on_delete=models.SET_NULL, null=True, blank=True, related_name='donnees_moyennes')  # Relation avec Niveau
     moyenne_generale = models.FloatField(null=True)
-    # Ajoutez ici d'autres colonnes qui apparaissent régulièrement dans le tableau Moyennes eleves
-    # Par exemple :
     rang_classe = models.IntegerField(null=True, blank=True)
     effectif_classe = models.IntegerField(null=True, blank=True)
-    # Pour les colonnes supplémentaires ou variables, nous utiliserons un champ JSON
     donnees_additionnelles = models.JSONField(default=dict, blank=True)
     
     def __str__(self):
@@ -136,7 +141,6 @@ class DonneesMoyennesEleves(models.Model):
         ordering = ['-moyenne_generale']
         verbose_name = "Données moyennes élèves"
         verbose_name_plural = "Données moyennes élèves"
-
 class DonneesDetailleesEleves(models.Model):
     """Stockage des données du tableau 'Données détaillées'"""
     import_fichier = models.ForeignKey(ImportFichier, on_delete=models.CASCADE, related_name='donnees_detaillees')

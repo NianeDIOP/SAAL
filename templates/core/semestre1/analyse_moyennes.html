@@ -123,10 +123,10 @@
         <h5 class="mb-0 text-primary"><i class="fas fa-filter me-2"></i>Filtres</h5>
     </div>
     <div class="card-body">
-        <form method="get" id="filtres-form" class="row g-3">
-            <div class="col-md-4">
-                <label for="niveau" class="form-label">Niveau</label>
-                <select class="form-select" id="niveau" name="niveau" onchange="this.form.submit()">
+        <form method="get" id="filtres-form" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label for="niveau" class="form-label small">Niveau</label>
+                <select class="form-select form-select-sm" id="niveau" name="niveau">
                     <option value="">Tous les niveaux</option>
                     {% for niveau in niveaux %}
                     <option value="{{ niveau.id }}" {% if selected_niveau == niveau.id|stringformat:"s" %}selected{% endif %}>
@@ -135,9 +135,9 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
-                <label for="classe" class="form-label">Classe</label>
-                <select class="form-select" id="classe" name="classe" onchange="this.form.submit()">
+            <div class="col-md-2">
+                <label for="classe" class="form-label small">Classe</label>
+                <select class="form-select form-select-sm" id="classe" name="classe">
                     <option value="">Toutes les classes</option>
                     {% for classe in classes %}
                     <option value="{{ classe.id }}" {% if selected_classe == classe.id|stringformat:"s" %}selected{% endif %}>
@@ -146,21 +146,46 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
-                <label for="import" class="form-label">Importation</label>
-                <select class="form-select" id="import" name="import" onchange="this.form.submit()">
+            <div class="col-md-2">
+                <label for="import" class="form-label small">Importation</label>
+                <select class="form-select form-select-sm" id="import" name="import">
                     <option value="">Toutes les importations</option>
                     {% for import in imports %}
                     <option value="{{ import.id }}" {% if selected_import == import.id|stringformat:"s" %}selected{% endif %}>
-                        {{ import.titre }} ({{ import.date_import|date:"d/m/Y" }})
+                        {{ import.titre }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-12">
-                <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()">
-                    <i class="fas fa-times me-2"></i>Réinitialiser les filtres
-                </button>
+            <div class="col-md-2">
+                <label for="sexe" class="form-label small">Sexe</label>
+                <select class="form-select form-select-sm" id="sexe" name="sexe">
+                    <option value="">Tous</option>
+                    <option value="M" {% if selected_sexe == "M" %}selected{% endif %}>Masculin</option>
+                    <option value="F" {% if selected_sexe == "F" %}selected{% endif %}>Féminin</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="intervalle" class="form-label small">Intervalle de moyenne</label>
+                <select class="form-select form-select-sm" id="intervalle" name="intervalle">
+                    <option value="">Tous</option>
+                    <option value="excellence" {% if selected_intervalle == "excellence" %}selected{% endif %}>Excellence (≥ 16)</option>
+                    <option value="tres_bien" {% if selected_intervalle == "tres_bien" %}selected{% endif %}>Très bien (14-15.99)</option>
+                    <option value="bien" {% if selected_intervalle == "bien" %}selected{% endif %}>Bien (12-13.99)</option>
+                    <option value="assez_bien" {% if selected_intervalle == "assez_bien" %}selected{% endif %}>Assez bien (10-11.99)</option>
+                    <option value="passable" {% if selected_intervalle == "passable" %}selected{% endif %}>Passable (8-9.99)</option>
+                    <option value="insuffisant" {% if selected_intervalle == "insuffisant" %}selected{% endif %}>Insuffisant (< 8)</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill">
+                        <i class="fas fa-search me-1"></i>Filtrer
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetFilters()">
+                        <i class="fas fa-times me-1"></i>Réinitialiser
+                    </button>
+                </div>
             </div>
         </form>
     </div>
@@ -233,7 +258,13 @@
                     <div class="progress progress-sm">
                         <div class="progress-bar bg-success" style="width: {{ stats.taux_reussite.pourcentage }}%"></div>
                     </div>
-                    <div class="mt-1 small text-muted">{{ stats.taux_reussite.nombre }} élèves avec moy. ≥ 10</div>
+                    <div class="mt-1 d-flex justify-content-between">
+                        <span class="small text-muted">{{ stats.taux_reussite.nombre }} élèves ≥ 10</span>
+                        <span class="small text-muted">
+                            <i class="fas fa-male text-primary"></i> {{ stats.taux_reussite.par_sexe.M|default:0 }}
+                            <i class="fas fa-female text-danger ms-1"></i> {{ stats.taux_reussite.par_sexe.F|default:0 }}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -251,7 +282,10 @@
                             <h3 class="fw-bold mb-0">{{ stats.absences.total|floatformat:0 }}</h3>
                         </div>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-warning" style="width: {% if stats.absences.max > 0 %}{{ stats.absences.total|div:stats.absences.max }}{% else %}0{% endif %}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
                         <span class="small text-muted">Abs. totales</span>
                         <span class="small text-muted">{{ stats.retards.total|floatformat:0 }} retards</span>
                     </div>
@@ -331,10 +365,10 @@
                                 {% for eleve in stats.top_eleves %}
                                 <tr>
                                     <td><span class="badge bg-primary">{{ eleve.rang }}</span></td>
-                                    <td>{{ eleve.nom_eleve }}</td>
-                                    <td>{{ eleve.prenom_eleve|default:"-" }}</td>
-                                    <td>{{ eleve.classe.nom }}</td>
-                                    <td class="text-end fw-bold">{{ eleve.moyenne_formattee }}</td>
+                                    <td>{{ eleve.nom }}</td>
+                                    <td>{{ eleve.prenom|default:"-" }}</td>
+                                    <td>{{ eleve.classe|default:"-" }}</td>
+                                    <td class="text-end fw-bold">{{ eleve.moyenne_generale|floatformat:2 }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -366,8 +400,43 @@
         </div>
         {% endif %}
         
-        <!-- Informations complémentaires -->
+        <!-- Décisions du conseil -->
         <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary"><i class="fas fa-tasks me-2"></i>Décisions du conseil</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.decisions %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="chartDecisions" class="chart-container"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-group dashboard-summary">
+                                {% for decision, count in stats.decisions.items %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                    <span>{{ decision }}</span>
+                                    <span class="badge bg-primary badge-rounded">{{ count }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center my-4">Aucune donnée disponible</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 4: Informations complémentaires -->
+<div class="dashboard-section">
+    <div class="row">
+        <!-- Informations complémentaires -->
+        <div class="col-md-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-white">
                     <h5 class="mb-0 text-primary"><i class="fas fa-info-circle me-2"></i>Informations complémentaires</h5>
@@ -378,31 +447,37 @@
                         {% if stats.appreciations %}
                         <div class="col-md-6">
                             <h6 class="section-title"><i class="fas fa-star me-2 text-warning"></i>Appréciations</h6>
-                            <ul class="list-group dashboard-summary">
+                            <div class="row">
                                 {% for appreciation, count in stats.appreciations.items %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
-                                    <span>{{ appreciation }}</span>
-                                    <span class="badge bg-info badge-rounded">{{ count }}</span>
-                                </li>
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>{{ appreciation }}</span>
+                                        <span class="badge bg-info badge-rounded">{{ count }}</span>
+                                    </div>
+                                </div>
                                 {% endfor %}
-                            </ul>
+                            </div>
                         </div>
                         {% endif %}
                         
-                        <!-- Décisions du conseil -->
-                        {% if stats.decisions %}
+                        <!-- Notes Min/Max -->
                         <div class="col-md-6">
-                            <h6 class="section-title"><i class="fas fa-tasks me-2 text-primary"></i>Décisions</h6>
-                            <ul class="list-group dashboard-summary">
-                                {% for decision, count in stats.decisions.items %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
-                                    <span>{{ decision }}</span>
-                                    <span class="badge bg-secondary badge-rounded">{{ count }}</span>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <h6 class="section-title"><i class="fas fa-chart-line me-2 text-primary"></i>Notes Min/Max</h6>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6 text-center">
+                                            <h3 class="text-primary mb-0">{{ stats.min_moyenne|floatformat:2 }}</h3>
+                                            <p class="text-muted mb-0 small">Note minimale</p>
+                                        </div>
+                                        <div class="col-6 text-center">
+                                            <h3 class="text-success mb-0">{{ stats.max_moyenne|floatformat:2 }}</h3>
+                                            <p class="text-muted mb-0 small">Note maximale</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -435,17 +510,67 @@
                         <th>Nom</th>
                         <th>Prénom</th>
                         <th>Classe</th>
+                        <th>Sexe</th>
                         <th class="text-end">Moyenne</th>
+                        <th>Décision</th>
+                        <th>Absences</th>
+                        <th>Retards</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for eleve in moyennes %}
                     <tr>
-                        <td>{{ eleve.rang }}</td>
-                        <td>{{ eleve.nom_eleve }}</td>
-                        <td>{{ eleve.prenom_eleve|default:"-" }}</td>
-                        <td>{{ eleve.classe.nom }}</td>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ eleve.nom }}</td>
+                        <td>{{ eleve.prenom|default:"-" }}</td>
+                        <td>
+                            {% if eleve.classe_obj %}
+                                {{ eleve.classe_obj.nom }}
+                            {% else %}
+                                {{ eleve.classe_texte|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if 'Sexe' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Sexe }}
+                            {% elif 'Genre' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Genre }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td class="text-end fw-bold">{{ eleve.moyenne_generale|floatformat:2 }}</td>
+                        <td>
+                            {% if 'Décision conseil' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles|get_item:'Décision conseil' }}
+                            {% elif 'Décision du conseil' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles|get_item:'Décision du conseil' }}
+                            {% elif 'Décision' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Décision }}
+                            {% elif 'Decision' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Decision }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if 'Absence' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Absence }}
+                            {% elif 'Absences' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Absences }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if 'Retard' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Retard }}
+                            {% elif 'Retards' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.Retards }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -481,7 +606,7 @@ $(document).ready(function() {
         responsive: true,
         dom: '<"d-flex justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex"f>>t<"d-flex justify-content-between align-items-center"<"d-flex"i><"d-flex"p>>',
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]],
-        order: [[4, 'desc']], // Trier par moyenne décroissante
+        order: [[5, 'desc']], // Trier par moyenne décroissante (colonne 5)
         pageLength: 25
     });
     
@@ -536,15 +661,15 @@ $(document).ready(function() {
     {% endif %}
     
     // Initialiser le graphique des moyennes par niveau
-    {% if stats.moyennes_par_niveau %}
+    {% if stats.moyennes_par_niveau and stats.moyennes_par_niveau.labels %}
     const ctxNiveaux = document.getElementById('chartNiveaux').getContext('2d');
     new Chart(ctxNiveaux, {
         type: 'bar',
         data: {
-            labels: {{ stats.moyennes_par_niveau.labels|safe }},
+            labels: [{% for label in stats.moyennes_par_niveau.labels %}"{{ label }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
             datasets: [{
                 label: 'Moyenne générale',
-                data: {{ stats.moyennes_par_niveau.data|safe }},
+                data: [{% for val in stats.moyennes_par_niveau.data %}{{ val }}{% if not forloop.last %}, {% endif %}{% endfor %}],
                 backgroundColor: 'rgba(59, 125, 221, 0.7)',
                 borderColor: '#3b7ddd',
                 borderWidth: 1
@@ -556,8 +681,8 @@ $(document).ready(function() {
             scales: {
                 y: {
                     beginAtZero: false,
-                    min: Math.max(0, Math.min(... {{ stats.moyennes_par_niveau.data|safe }}) - 2),
-                    max: Math.max(... {{ stats.moyennes_par_niveau.data|safe }}) + 1,
+                    min: Math.max(0, Math.min({% for val in stats.moyennes_par_niveau.data %}{{ val }}{% if not forloop.last %}, {% endif %}{% endfor %}) - 2),
+                    max: Math.max({% for val in stats.moyennes_par_niveau.data %}{{ val }}{% if not forloop.last %}, {% endif %}{% endfor %}) + 1,
                     ticks: {
                         precision: 1
                     }
@@ -571,6 +696,56 @@ $(document).ready(function() {
         }
     });
     {% endif %}
+    
+    // Initialiser le graphique des décisions du conseil
+    {% if stats.decisions %}
+    const ctxDecisions = document.getElementById('chartDecisions').getContext('2d');
+    new Chart(ctxDecisions, {
+        type: 'pie',
+        data: {
+            labels: [
+                {% for decision, count in stats.decisions.items %}
+                "{{ decision }}",
+                {% endfor %}
+            ],
+            datasets: [{
+                data: [
+                    {% for decision, count in stats.decisions.items %}
+                    {{ count }},
+                    {% endfor %}
+                ],
+                backgroundColor: [
+                    '#3b7ddd', '#28a745', '#0dcaf0', '#ffc107', '#6c757d', '#dc3545',
+                    '#7952b3', '#20c997', '#17a2b8', '#fd7e14', '#e83e8c', '#6610f2'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var label = context.label || '';
+                            var value = context.raw || 0;
+                            var total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            var percentage = Math.round(value / total * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
 });
 
 // Fonction pour réinitialiser les filtres
@@ -578,6 +753,8 @@ function resetFilters() {
     document.getElementById('niveau').value = '';
     document.getElementById('classe').value = '';
     document.getElementById('import').value = '';
+    document.getElementById('sexe').value = '';
+    document.getElementById('intervalle').value = '';
     document.getElementById('filtres-form').submit();
 }
 
@@ -643,6 +820,12 @@ function printTable() {
     
     window.print();
     document.body.innerHTML = originalContents;
+    
+    // Réinitialiser les fonctionnalités JavaScript après l'impression
+    // (nécessaire car le DOM a été remplacé)
+    setTimeout(function() {
+        location.reload();
+    }, 100);
 }
 </script>
 {% endblock %}
