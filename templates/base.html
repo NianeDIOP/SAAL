@@ -19,11 +19,69 @@
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     
     {% block extra_css %}{% endblock %}
+    
+    <style>
+        /* Ajustements pour rendre les tableaux plus responsifs */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Styles pour les tableaux larges */
+        .table-wide {
+            min-width: 100%;
+            width: auto;
+        }
+        
+        /* Styles pour la mise en page d'administration */
+        .admin-layout {
+            display: flex;
+            flex-direction: row;
+            min-height: calc(100vh - 70px);
+        }
+        
+        .admin-sidebar {
+            width: 250px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e3e6f0;
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+            z-index: 1;
+            padding-top: 1rem;
+        }
+        
+        .admin-content {
+            flex: 1;
+            padding: 1rem;
+            max-width: calc(100% - 250px);
+            overflow-x: auto;
+        }
+        
+        /* Ajustement pour les écrans plus petits */
+        @media (max-width: 768px) {
+            .admin-layout {
+                flex-direction: column;
+            }
+            
+            .admin-sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                top: 0;
+            }
+            
+            .admin-content {
+                max-width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow sticky-top">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center" href="{% url 'core:accueil' %}">
                 <i class="fas fa-chart-line me-2"></i>
                 <span>SAAL</span>
@@ -64,10 +122,10 @@
     </nav>
 
     <!-- Contenu principal -->
-    <main class="container my-4">
+    <main class="container-fluid">
         <!-- Messages flash -->
         {% if messages %}
-        <div class="messages mb-4">
+        <div class="messages mb-4 mt-3">
             {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
                 <i class="fas fa-info-circle me-2"></i> {{ message }}
@@ -82,7 +140,7 @@
 
     <!-- Pied de page -->
     <footer class="bg-light py-4 mt-5 border-top">
-        <div class="container text-center">
+        <div class="container-fluid text-center">
             <p class="mb-0 text-muted">© 2025 SAAL - Système d'Analyse Académique Local</p>
         </div>
     </footer>
@@ -90,7 +148,6 @@
     <!-- Bootstrap JS Bundle avec Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <!-- Notre JavaScript personnalisé -->

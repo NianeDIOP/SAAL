@@ -174,6 +174,9 @@
                                                             data-id="{{ niveau.id }}" data-nom="{{ niveau.nom }}" data-description="{{ niveau.description }}" data-ordre="{{ niveau.ordre }}">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
+                                                    <a href="{% url 'core:niveau_delete' niveau.id %}" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
                                                 </td>
                                             </tr>
                                             {% empty %}
@@ -241,6 +244,7 @@
                                                 <th>Nom</th>
                                                 <th>Niveau</th>
                                                 <th class="text-center">Effectif</th>
+                                                <th class="text-end">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -249,10 +253,15 @@
                                                 <td>{{ classe.nom }}</td>
                                                 <td>{{ classe.niveau.nom }}</td>
                                                 <td class="text-center">{{ classe.effectif }}</td>
+                                                <td class="text-end">
+                                                    <a href="{% url 'core:classe_delete' classe.id %}" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </td>
                                             </tr>
                                             {% empty %}
                                             <tr>
-                                                <td colspan="3" class="text-center">Aucune classe configurée.</td>
+                                                <td colspan="4" class="text-center">Aucune classe configurée.</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>

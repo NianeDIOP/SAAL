@@ -86,3 +86,43 @@ class MoyenneDiscipline(models.Model):
     
     def __str__(self):
         return f"{self.eleve.nom_eleve} - {self.nom_discipline}: {self.moyenne}"
+    
+    # Ajoutez ceci à models.py
+
+class DonneesMoyennesEleves(models.Model):
+    """Stockage des données du tableau 'Moyennes eleves'"""
+    import_fichier = models.ForeignKey(ImportFichier, on_delete=models.CASCADE, related_name='donnees_moyennes')
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField(max_length=100, blank=True, null=True)
+    classe = models.CharField(max_length=50, blank=True, null=True)
+    moyenne_generale = models.FloatField(null=True)
+    # Ajoutez ici d'autres colonnes qui apparaissent régulièrement dans le tableau Moyennes eleves
+    # Par exemple :
+    rang_classe = models.IntegerField(null=True, blank=True)
+    effectif_classe = models.IntegerField(null=True, blank=True)
+    # Pour les colonnes supplémentaires ou variables, nous utiliserons un champ JSON
+    donnees_additionnelles = models.JSONField(default=dict, blank=True)
+    
+    def __str__(self):
+        return f"{self.nom} {self.prenom or ''} - {self.moyenne_generale}"
+    
+    class Meta:
+        ordering = ['-moyenne_generale']
+        verbose_name = "Données moyennes élèves"
+        verbose_name_plural = "Données moyennes élèves"
+
+class DonneesDetailleesEleves(models.Model):
+    """Stockage des données du tableau 'Données détaillées'"""
+    import_fichier = models.ForeignKey(ImportFichier, on_delete=models.CASCADE, related_name='donnees_detaillees')
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField(max_length=100, blank=True, null=True)
+    classe = models.CharField(max_length=50, blank=True, null=True)
+    # Pour les colonnes de disciplines qui sont variables, nous utiliserons un champ JSON
+    disciplines = models.JSONField(default=dict, blank=True)
+    
+    def __str__(self):
+        return f"{self.nom} {self.prenom or ''}"
+    
+    class Meta:
+        verbose_name = "Données détaillées élèves"
+        verbose_name_plural = "Données détaillées élèves"

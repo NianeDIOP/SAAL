@@ -7,16 +7,54 @@
     Importez et nettoyez les fichiers Excel exportés depuis la plateforme Planète
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+<style>
+    .import-form-card {
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .upload-area:hover {
+        border-color: #3b7ddd;
+        background-color: rgba(59, 125, 221, 0.05);
+    }
+    
+    .upload-icon {
+        font-size: 3rem;
+        color: #3b7ddd;
+        margin-bottom: 1rem;
+    }
+    
+    .file-info {
+        display: none;
+        margin-top: 1rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
 {% block semestre1_content %}
 <div class="row g-4">
     <!-- Formulaire d'importation -->
-    <div class="col-md-6">
-        <div class="card shadow-sm">
+    <div class="col-lg-5">
+        <div class="card import-form-card">
             <div class="card-header bg-white">
                 <h5 class="mb-0 text-primary"><i class="fas fa-file-import me-2"></i>Nouvelle importation</h5>
             </div>
             <div class="card-body">
-                <form method="post" action="{% url 'core:semestre1_importation' %}" enctype="multipart/form-data">
+                <form method="post" action="{% url 'core:semestre1_importation' %}" enctype="multipart/form-data" id="import-form">
                     {% csrf_token %}
                     
                     <div class="mb-3">
@@ -25,9 +63,20 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="fichier_excel" class="form-label">Fichier Excel*</label>
-                        <input type="file" class="form-control" id="fichier_excel" name="fichier_excel" accept=".xlsx, .xls" required>
-                        <div class="form-text">Sélectionnez un fichier Excel exporté depuis la plateforme Planète.</div>
+                        <label class="form-label">Fichier Excel*</label>
+                        <div class="upload-area" id="upload-area" onclick="triggerFileInput()">
+                            <div class="upload-content">
+                                <i class="fas fa-file-excel upload-icon"></i>
+                                <h5>Déposez votre fichier Excel ici</h5>
+                                <p class="text-muted">ou cliquez pour sélectionner un fichier</p>
+                                <p class="text-muted small">Format accepté: .xlsx</p>
+                            </div>
+                            <div class="file-info" id="file-info">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span id="file-name">Aucun fichier sélectionné</span>
+                            </div>
+                        </div>
+                        <input type="file" class="d-none" id="fichier_excel" name="fichier_excel" accept=".xlsx, .xls" required>
                     </div>
                     
                     <div class="mb-4">
@@ -51,38 +100,61 @@
         </div>
         
         <!-- Instructions -->
-        <div class="card shadow-sm mt-4">
+        <div class="card mt-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0 text-primary"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
             </div>
             <div class="card-body">
                 <p>Le processus d'importation traite automatiquement :</p>
-                <ul>
-                    <li>L'onglet "Moyennes eleves" (en ignorant les 11 premières lignes)</li>
-                    <li>L'onglet "Données détaillées" (en ignorant les 8 premières lignes)</li>
-                    <li>La fusion des informations élèves avec leurs moyennes par discipline</li>
-                </ul>
-                <p>Assurez-vous que votre fichier Excel respecte la structure attendue des exports Planète.</p>
+                <div class="d-flex mb-2">
+                    <div class="me-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 25px; height: 25px; font-size: 14px;">1</div>
+                    </div>
+                    <div>
+                        <strong>Onglet "Moyennes eleves"</strong>
+                        <p class="text-muted small mb-0">Les 11 premières lignes sont ignorées</p>
+                    </div>
+                </div>
+                <div class="d-flex mb-2">
+                    <div class="me-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 25px; height: 25px; font-size: 14px;">2</div>
+                    </div>
+                    <div>
+                        <strong>Onglet "Données détaillées"</strong>
+                        <p class="text-muted small mb-0">Les 8 premières lignes sont ignorées</p>
+                    </div>
+                </div>
+                <div class="d-flex mb-2">
+                    <div class="me-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 25px; height: 25px; font-size: 14px;">3</div>
+                    </div>
+                    <div>
+                        <strong>Fusion des données</strong>
+                        <p class="text-muted small mb-0">Extraction et association des moyennes par discipline</p>
+                    </div>
+                </div>
+                <hr>
+                <p class="small text-muted mb-0"><i class="fas fa-exclamation-circle me-1"></i> Assurez-vous que votre fichier Excel respecte la structure attendue des exports Planète.</p>
             </div>
         </div>
     </div>
     
     <!-- Historique des importations -->
-    <div class="col-md-6">
-        <div class="card shadow-sm">
+    <div class="col-lg-7">
+        <div class="card">
             <div class="card-header bg-white">
                 <h5 class="mb-0 text-primary"><i class="fas fa-history me-2"></i>Historique des importations</h5>
             </div>
             <div class="card-body">
                 {% if imports %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table id="imports-table" class="table table-hover table-striped">
                         <thead>
                             <tr>
                                 <th>Titre</th>
                                 <th>Date</th>
-                                <th>Statut</th>
-                                <th>Actions</th>
+                                <th class="text-center">Statut</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -90,7 +162,7 @@
                             <tr>
                                 <td>{{ import.titre }}</td>
                                 <td>{{ import.date_import|date:"d/m/Y H:i" }}</td>
-                                <td>
+                                <td class="text-center">
                                     {% if import.statut == 'termine' %}
                                     <span class="badge bg-success">Terminé</span>
                                     {% elif import.statut == 'en_cours' %}
@@ -99,15 +171,15 @@
                                     <span class="badge bg-danger" data-bs-toggle="tooltip" title="{{ import.erreur_message }}">Erreur</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <div class="btn-group">
-                                        <a href="{% url 'core:semestre1_importation_detail' import.id %}" class="btn btn-sm btn-outline-primary">
+                                        <a href="{% url 'core:semestre1_importation_detail' import.id %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Voir les détails">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <a href="{{ import.fichier.url }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                        <a href="{{ import.fichier.url }}" class="btn btn-sm btn-outline-secondary" target="_blank" data-bs-toggle="tooltip" title="Télécharger">
                                             <i class="fas fa-download"></i>
                                         </a>
-                                        <a href="{% url 'core:semestre1_importation_delete' import.id %}" class="btn btn-sm btn-outline-danger">
+                                        <a href="{% url 'core:semestre1_importation_delete' import.id %}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Supprimer">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -127,4 +199,118 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+// Initialisation de DataTables pour la table des importations
+$(document).ready(function() {
+    $('#imports-table').DataTable({
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+        },
+        responsive: true,
+        order: [[1, 'desc']], // Trier par date décroissante
+        pageLength: 10,
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "Tous"]]
+    });
+    
+    // Initialiser les tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+});
+
+// Fonctions pour l'upload de fichier
+function triggerFileInput() {
+    document.getElementById('fichier_excel').click();
+}
+
+// Écouter les changements dans l'input file
+document.getElementById('fichier_excel').addEventListener('change', function(e) {
+    const fileInput = e.target;
+    const fileName = fileInput.files[0] ? fileInput.files[0].name : 'Aucun fichier sélectionné';
+    const fileInfo = document.getElementById('file-info');
+    const fileNameElement = document.getElementById('file-name');
+    const uploadContent = document.querySelector('.upload-content');
+    
+    if (fileInput.files[0]) {
+        fileNameElement.textContent = fileName;
+        fileInfo.style.display = 'block';
+        uploadContent.style.display = 'none';
+        document.getElementById('upload-area').style.padding = '1rem';
+    } else {
+        fileInfo.style.display = 'none';
+        uploadContent.style.display = 'block';
+        document.getElementById('upload-area').style.padding = '2rem';
+    }
+});
+
+// Drag and drop pour l'upload
+const uploadArea = document.getElementById('upload-area');
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, unhighlight, false);
+});
+
+function highlight() {
+    uploadArea.classList.add('bg-light');
+}
+
+function unhighlight() {
+    uploadArea.classList.remove('bg-light');
+}
+
+uploadArea.addEventListener('drop', handleDrop, false);
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 0) {
+        const fileInput = document.getElementById('fichier_excel');
+        fileInput.files = files;
+        
+        // Déclencher l'événement change manuellement
+        const event = new Event('change', { bubbles: true });
+        fileInput.dispatchEvent(event);
+    }
+}
+
+// Validation du formulaire
+document.getElementById('import-form').addEventListener('submit', function(e) {
+    const fileInput = document.getElementById('fichier_excel');
+    const titleInput = document.getElementById('titre');
+    
+    if (!fileInput.files[0]) {
+        e.preventDefault();
+        alert('Veuillez sélectionner un fichier Excel.');
+        return false;
+    }
+    
+    if (!titleInput.value.trim()) {
+        e.preventDefault();
+        alert('Veuillez saisir un titre pour cette importation.');
+        return false;
+    }
+    
+    return true;
+});
+</script>
 {% endblock %}

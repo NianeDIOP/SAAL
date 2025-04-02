@@ -15,6 +15,50 @@
     {% endif %}
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap5.min.css">
+<style>
+    .nav-tabs .nav-link {
+        padding: 0.75rem 1.25rem;
+        border-radius: 0;
+        font-weight: 500;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: #fff;
+        border-bottom: 3px solid #3b7ddd;
+        color: #3b7ddd;
+    }
+    
+    .table-actions {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 10px 0;
+        z-index: 10;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    @media print {
+        .admin-sidebar, .navbar, .footer, .table-actions, .nav-tabs {
+            display: none !important;
+        }
+        
+        .admin-content {
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        body {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block semestre1_content %}
 <div class="row mb-3">
     <div class="col-12">
@@ -30,7 +74,7 @@
 </div>
 
 <!-- Navigation par onglets -->
-<ul class="nav nav-tabs mb-4" id="importTabs" role="tablist">
+<ul class="nav nav-tabs mb-0" id="importTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'moyennes' %}active{% endif %}" 
                 id="moyennes-tab" 
@@ -65,20 +109,26 @@
          role="tabpanel" 
          aria-labelledby="moyennes-tab">
         
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 text-primary"><i class="fas fa-table me-2"></i>Tableau des moyennes élèves</h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="exportTable('moyennes-table', 'Moyennes_Eleves')">
-                        <i class="fas fa-download me-1"></i>Exporter
-                    </button>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-actions p-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-table me-2"></i>Tableau des moyennes élèves</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="exportTableToCSV('moyennes-table', 'Moyennes_Eleves')">
+                                <i class="fas fa-download me-1"></i>Exporter
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="printTable('moyennes-table', 'Moyennes des élèves')">
+                                <i class="fas fa-print me-1"></i>Imprimer
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
+                
                 {% if excel_data.moyennes %}
                 <div class="table-responsive">
                     <table id="moyennes-table" class="table table-striped table-hover">
-                        <thead>
+                        <thead class="table-light">
                             <tr>
                                 {% for colonne in excel_data.moyennes.colonnes %}
                                 <th>{{ colonne }}</th>
@@ -97,7 +147,7 @@
                     </table>
                 </div>
                 {% else %}
-                <div class="alert alert-info">
+                <div class="alert alert-info m-3">
                     <i class="fas fa-info-circle me-2"></i>
                     Aucune donnée disponible pour cet onglet.
                 </div>
@@ -112,20 +162,26 @@
          role="tabpanel" 
          aria-labelledby="details-tab">
         
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 text-primary"><i class="fas fa-book me-2"></i>Tableau des données détaillées</h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="exportTable('details-table', 'Donnees_Detaillees')">
-                        <i class="fas fa-download me-1"></i>Exporter
-                    </button>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-actions p-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-book me-2"></i>Tableau des données détaillées</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="exportTableToCSV('details-table', 'Donnees_Detaillees')">
+                                <i class="fas fa-download me-1"></i>Exporter
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="printTable('details-table', 'Données détaillées')">
+                                <i class="fas fa-print me-1"></i>Imprimer
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
+                
                 {% if excel_data.details %}
                 <div class="table-responsive">
                     <table id="details-table" class="table table-striped table-hover">
-                        <thead>
+                        <thead class="table-light">
                             <tr>
                                 {% for colonne in excel_data.details.colonnes %}
                                 <th>{{ colonne }}</th>
@@ -144,7 +200,7 @@
                     </table>
                 </div>
                 {% else %}
-                <div class="alert alert-info">
+                <div class="alert alert-info m-3">
                     <i class="fas fa-info-circle me-2"></i>
                     Aucune donnée disponible pour cet onglet.
                 </div>
@@ -156,23 +212,59 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.bootstrap5.min.js"></script>
 <script>
-// Fonction pour exporter les tableaux en CSV
-function exportTable(tableId, filename) {
+// Initialisation de DataTables
+$(document).ready(function() {
+    // Tableau des moyennes élèves
+    $('#moyennes-table').DataTable({
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+        },
+        responsive: true,
+        dom: '<"d-flex justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex"f>>t<"d-flex justify-content-between align-items-center"<"d-flex"i><"d-flex"p>>',
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]],
+        order: [], // Ne pas trier par défaut
+        pageLength: 25,
+        scrollX: true
+    });
+    
+    // Tableau des données détaillées
+    $('#details-table').DataTable({
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+        },
+        responsive: true,
+        dom: '<"d-flex justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex"f>>t<"d-flex justify-content-between align-items-center"<"d-flex"i><"d-flex"p>>',
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]],
+        order: [], // Ne pas trier par défaut
+        pageLength: 25,
+        scrollX: true
+    });
+});
+
+// Fonction d'export CSV améliorée
+function exportTableToCSV(tableId, filename) {
     const table = document.getElementById(tableId);
     let csv = [];
     const rows = table.querySelectorAll('tr');
     
     for (let i = 0; i < rows.length; i++) {
-        const row = [], cols = rows[i].querySelectorAll('td, th');
-        
-        for (let j = 0; j < cols.length; j++) {
-            // Nettoyer les données et ajouter des guillemets pour éviter les problèmes avec les virgules
-            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/"/g, '""');
-            row.push('"' + data + '"');
+        // Ne sélectionner que les lignes visibles (pour correspondre aux filtres)
+        if (!$(rows[i]).hasClass('d-none') && window.getComputedStyle(rows[i]).display !== 'none') {
+            const row = [], cols = rows[i].querySelectorAll('td, th');
+            
+            for (let j = 0; j < cols.length; j++) {
+                // Nettoyer les données et ajouter des guillemets pour éviter les problèmes avec les virgules
+                let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/"/g, '""');
+                row.push('"' + data + '"');
+            }
+            
+            csv.push(row.join(','));
         }
-        
-        csv.push(row.join(','));        
     }
     
     // Télécharger le CSV
@@ -186,6 +278,55 @@ function exportTable(tableId, filename) {
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
+}
+
+// Fonction pour imprimer un tableau spécifique
+function printTable(tableId, title) {
+    const tableElement = document.getElementById(tableId);
+    const printContents = tableElement.outerHTML;
+    const originalContents = document.body.innerHTML;
+    
+    document.body.innerHTML = `
+        <html>
+            <head>
+                <title>${title}</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 20px; }
+                    h1 { font-size: 20px; margin-bottom: 20px; font-weight: bold; }
+                    .print-header { margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>${title}</h1>
+                    <p>Importation: ${document.getElementById('semestre1_title').innerText}</p>
+                    <p>Date d'impression: ${new Date().toLocaleDateString()}</p>
+                </div>
+                ${printContents}
+            </body>
+        </html>
+    `;
+    
+    window.print();
+    document.body.innerHTML = originalContents;
+    
+    // Réinitialiser les tables DataTables après l'impression
+    // (car le DOM a été recréé)
+    $(document).ready(function() {
+        $('#moyennes-table').DataTable({
+            language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json' },
+            responsive: true, pageLength: 25, scrollX: true
+        });
+        
+        $('#details-table').DataTable({
+            language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json' },
+            responsive: true, pageLength: 25, scrollX: true
+        });
+    });
 }
 
 // Enregistrer l'onglet actif dans l'URL lors du changement

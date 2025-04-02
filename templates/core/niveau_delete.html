@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}SAAL - Supprimer le niveau{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h2 mb-3 fw-bold"><i class="fas fa-trash me-2 text-danger"></i>Supprimer le niveau</h1>
+        <p class="text-muted">Vous êtes sur le point de supprimer le niveau "{{ niveau.nom }}".</p>
+        <hr class="mb-4">
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Confirmation requise</h5>
+            </div>
+            <div class="card-body">
+                {% if classes_associees.exists %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Attention :</strong> Ce niveau contient {{ classes_associees.count }} classe(s) qui seront également supprimées :
+                    <ul class="mt-2 mb-0">
+                        {% for classe in classes_associees %}
+                        <li>{{ classe.nom }} ({{ classe.effectif }} élèves)</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                <p>Cette action est <strong>irréversible</strong>. Êtes-vous sûr de vouloir continuer ?</p>
+                
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    {% if confirmation_requise %}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="confirmer_suppression_classes" name="confirmer_suppression_classes" required>
+                        <label class="form-check-label" for="confirmer_suppression_classes">
+                            Je confirme la suppression de toutes les classes associées
+                        </label>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-2"></i>Supprimer définitivement
+                        </button>
+                        <a href="{% url 'core:configuration' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>Annuler
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
