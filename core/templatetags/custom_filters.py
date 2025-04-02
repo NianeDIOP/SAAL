@@ -17,3 +17,4 @@ def div(value, arg):
         return float(value) * 100 / float(arg)
     except (ValueError, ZeroDivisionError):
         return 0
+    

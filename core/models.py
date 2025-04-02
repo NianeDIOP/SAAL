@@ -70,14 +70,40 @@ class MoyenneEleve(models.Model):
     nom_eleve = models.CharField(max_length=100)
     prenom_eleve = models.CharField(max_length=100, blank=True, null=True)
     classe = models.ForeignKey(Classe, on_delete=models.CASCADE, related_name='moyennes')
-    moyenne_generale = models.FloatField()
+    moyenne_generale = models.FloatField(null=True, blank=True)
     rang = models.IntegerField(null=True, blank=True)
     
     def __str__(self):
         return f"{self.nom_eleve} {self.prenom_eleve or ''} - {self.moyenne_generale}"
     
+    def moyenne_formattee(self):
+        """
+        Formate la moyenne avec gestion des cas spéciaux
+        """
+        if self.moyenne_generale is None:
+            return "0.00"
+        try:
+            # Forcer la conversion en float et formater à 2 décimales
+            return "{:.2f}".format(float(self.moyenne_generale))
+        except (ValueError, TypeError):
+            return "0.00"
+    
+    def get_nom_complet(self):
+        """
+        Retourne le nom complet de l'élève
+        """
+        return f"{self.nom_eleve} {self.prenom_eleve or ''}".strip()
+    
+    def get_classe_niveau(self):
+        """
+        Retourne le nom de la classe avec son niveau
+        """
+        return f"{self.classe.nom} ({self.classe.niveau.nom})"
+    
     class Meta:
         ordering = ['-moyenne_generale']
+        verbose_name = "Moyenne Élève"
+        verbose_name_plural = "Moyennes Élèves"
 
 class MoyenneDiscipline(models.Model):
     eleve = models.ForeignKey(MoyenneEleve, on_delete=models.CASCADE, related_name='disciplines')

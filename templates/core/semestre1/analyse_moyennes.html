@@ -334,7 +334,7 @@
                                     <td>{{ eleve.nom_eleve }}</td>
                                     <td>{{ eleve.prenom_eleve|default:"-" }}</td>
                                     <td>{{ eleve.classe.nom }}</td>
-                                    <td class="text-end fw-bold">{{ eleve.moyenne_generale|floatformat:2 }}</td>
+                                    <td class="text-end fw-bold">{{ eleve.moyenne_formattee }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
