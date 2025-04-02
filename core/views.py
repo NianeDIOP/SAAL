@@ -792,11 +792,25 @@ def semestre1_analyse_moyennes(request):
         
         # 7. Top 5 des élèves
         top_eleves = donnees_moyennes[:5] if len(donnees_moyennes) >= 5 else donnees_moyennes
-        
+
         # Ajouter rang pour affichage
         for i, d in enumerate(top_eleves):
             d.rang = i + 1
-            stats['top_eleves'] = top_eleves
+            
+            # Debug pour voir ce qu'on a comme données
+            if hasattr(d, 'donnees_additionnelles'):
+                print(f"TOP ELEVE: {d.nom}, prénom={d.prenom}, "
+                    f"clés disponibles: {d.donnees_additionnelles.keys() if d.donnees_additionnelles else 'aucune'}")
+                
+            # Compléter les données manquantes
+            if not d.prenom and hasattr(d, 'donnees_additionnelles') and d.donnees_additionnelles:
+                for key in ['Prénom', 'prenom', 'Prenom', 'PRENOM']:
+                    if key in d.donnees_additionnelles and d.donnees_additionnelles[key]:
+                        d.prenom = str(d.donnees_additionnelles[key])
+                        print(f"Prénom ajouté: {d.prenom}")
+                        break
+
+        stats['top_eleves'] = top_eleves
     
     context = {
         'etablissement': etablissement,

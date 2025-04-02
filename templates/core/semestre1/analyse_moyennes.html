@@ -178,12 +178,12 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-sm btn-primary flex-fill">
+                <label for="filtre-actions" class="form-label small">&nbsp;</label>
+                <div class="d-flex gap-2" id="filtre-actions">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill h-100" style="height: 40px !important;">
                         <i class="fas fa-search me-1"></i>Filtrer
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetFilters()">
-                        <i class="fas fa-times me-1"></i>Réinitialiser
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill h-100" style="height: 40px !important;" onclick="resetFilters()">
                     </button>
                 </div>
             </div>
@@ -192,6 +192,31 @@
 </div>
 
 {% if stats %}
+<!-- Éléments cachés pour stocker les informations d'exportation -->
+<div id="etablissement-info" style="display: none;"
+     data-nom="{{ etablissement.nom }}"
+     data-adresse="{{ etablissement.adresse|default:'' }}"
+     data-annee-scolaire="{{ etablissement.annee_scolaire_active }}">
+</div>
+
+<!-- Informations sur les filtres appliqués -->
+<div id="filtre-info" style="display: none;"
+     data-niveau="{% for niveau in niveaux %}{% if selected_niveau == niveau.id|stringformat:'s' %}{{ niveau.nom }}{% endif %}{% endfor %}"
+     data-classe="{% for classe in classes %}{% if selected_classe == classe.id|stringformat:'s' %}{{ classe.nom }}{% endif %}{% endfor %}"
+     data-sexe="{{ selected_sexe|default:'' }}"
+     data-intervalle="{{ selected_intervalle|default:'' }}"
+     data-import="{% for import in imports %}{% if selected_import == import.id|stringformat:'s' %}{{ import.titre }}{% endif %}{% endfor %}">
+</div>
+
+<!-- Statistiques de synthèse -->
+<div id="stats-info" style="display: none;"
+     data-effectif="{{ stats.nb_eleves }}"
+     data-moyenne-generale="{{ stats.moyenne_globale|floatformat:2 }}"
+     data-taux-reussite="{{ stats.taux_reussite.pourcentage|floatformat:1 }}"
+     data-min-moyenne="{{ stats.min_moyenne|floatformat:2 }}"
+     data-max-moyenne="{{ stats.max_moyenne|floatformat:2 }}">
+</div>
+
 <!-- Tableau de bord -->
 <div class="dashboard-section">
     <!-- Section 1: Statistiques générales -->
@@ -213,7 +238,9 @@
                         <span class="small text-muted">
                             {% if stats.sexe.M > 0 or stats.sexe.F > 0 %}
                             <i class="fas fa-male text-primary"></i> {{ stats.sexe.M }} 
+                            ({% if stats.nb_eleves > 0 %}{{ stats.sexe.M|div:stats.nb_eleves|floatformat:1 }}{% else %}0{% endif %}%)
                             <i class="fas fa-female text-danger ms-2"></i> {{ stats.sexe.F }}
+                            ({% if stats.nb_eleves > 0 %}{{ stats.sexe.F|div:stats.nb_eleves|floatformat:1 }}{% else %}0{% endif %}%)
                             {% endif %}
                         </span>
                     </div>
@@ -261,8 +288,10 @@
                     <div class="mt-1 d-flex justify-content-between">
                         <span class="small text-muted">{{ stats.taux_reussite.nombre }} élèves ≥ 10</span>
                         <span class="small text-muted">
-                            <i class="fas fa-male text-primary"></i> {{ stats.taux_reussite.par_sexe.M|default:0 }}
+                            <i class="fas fa-male text-primary"></i> {{ stats.taux_reussite.par_sexe.M|default:0 }} 
+                            ({% if stats.sexe.M > 0 %}{{ stats.taux_reussite.par_sexe.M|div:stats.sexe.M|floatformat:1 }}{% else %}0{% endif %}%)
                             <i class="fas fa-female text-danger ms-1"></i> {{ stats.taux_reussite.par_sexe.F|default:0 }}
+                            ({% if stats.sexe.F > 0 %}{{ stats.taux_reussite.par_sexe.F|div:stats.sexe.F|floatformat:1 }}{% else %}0{% endif %}%)
                         </span>
                     </div>
                 </div>
@@ -294,7 +323,6 @@
         </div>
     </div>
 </div>
-
 <!-- Section 2: Répartition & Distribution -->
 <div class="dashboard-section">
     <div class="row">
@@ -366,8 +394,30 @@
                                 <tr>
                                     <td><span class="badge bg-primary">{{ eleve.rang }}</span></td>
                                     <td>{{ eleve.nom }}</td>
-                                    <td>{{ eleve.prenom|default:"-" }}</td>
-                                    <td>{{ eleve.classe|default:"-" }}</td>
+                                    <td>
+                                        {% if eleve.prenom %}
+                                            {{ eleve.prenom }}
+                                        {% elif eleve.donnees_additionnelles.Prénom %}
+                                            {{ eleve.donnees_additionnelles.Prénom }}
+                                        {% elif eleve.donnees_additionnelles.prénom %}
+                                            {{ eleve.donnees_additionnelles.prénom }}
+                                        {% elif eleve.donnees_additionnelles.Prenom %}
+                                            {{ eleve.donnees_additionnelles.Prenom }}
+                                        {% elif eleve.donnees_additionnelles.prenom %}
+                                            {{ eleve.donnees_additionnelles.prenom }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if eleve.classe_obj %}
+                                            {{ eleve.classe_obj.nom }}
+                                        {% elif eleve.classe_texte %}
+                                            {{ eleve.classe_texte }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                     <td class="text-end fw-bold">{{ eleve.moyenne_generale|floatformat:2 }}</td>
                                 </tr>
                                 {% endfor %}
@@ -413,14 +463,32 @@
                             <canvas id="chartDecisions" class="chart-container"></canvas>
                         </div>
                         <div class="col-md-6">
-                            <ul class="list-group dashboard-summary">
-                                {% for decision, count in stats.decisions.items %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
-                                    <span>{{ decision }}</span>
-                                    <span class="badge bg-primary badge-rounded">{{ count }}</span>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Décision</th>
+                                            <th class="text-end">Nombre</th>
+                                            <th class="text-end">Pourcentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for decision, count in stats.decisions.items %}
+                                        <tr>
+                                            <td>{{ decision }}</td>
+                                            <td class="text-end">{{ count }}</td>
+                                            <td class="text-end">
+                                                {% if stats.nb_eleves > 0 %}
+                                                    {{ count|div:stats.nb_eleves|floatformat:1 }}%
+                                                {% else %}
+                                                    0%
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                     {% else %}
@@ -431,7 +499,6 @@
         </div>
     </div>
 </div>
-
 <!-- Section 4: Informations complémentaires -->
 <div class="dashboard-section">
     <div class="row">
@@ -492,9 +559,12 @@
             <h5 class="mb-0 text-primary"><i class="fas fa-table me-2"></i>Liste complète des élèves</h5>
             <div>
                 <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadTableAsCSV()">
-                    <i class="fas fa-download me-1"></i>Exporter CSV
+                    <i class="fas fa-file-csv me-1"></i>Exporter CSV
                 </button>
-                <button class="btn btn-sm btn-outline-success" onclick="printTable()">
+                <button class="btn btn-sm btn-outline-success me-2" onclick="downloadTableAsExcel()">
+                    <i class="fas fa-file-excel me-1"></i>Exporter Excel
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="printTable()">
                     <i class="fas fa-print me-1"></i>Imprimer
                 </button>
             </div>
@@ -522,7 +592,21 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td>{{ eleve.nom }}</td>
-                        <td>{{ eleve.prenom|default:"-" }}</td>
+                        <td>
+                            {% if eleve.prenom %}
+                                {{ eleve.prenom }}
+                            {% elif eleve.donnees_additionnelles.Prénom %}
+                                {{ eleve.donnees_additionnelles.Prénom }}
+                            {% elif eleve.donnees_additionnelles.prénom %}
+                                {{ eleve.donnees_additionnelles.prénom }}
+                            {% elif eleve.donnees_additionnelles.Prenom %}
+                                {{ eleve.donnees_additionnelles.Prenom }}
+                            {% elif eleve.donnees_additionnelles.prenom %}
+                                {{ eleve.donnees_additionnelles.prenom }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>
                             {% if eleve.classe_obj %}
                                 {{ eleve.classe_obj.nom }}
@@ -533,8 +617,12 @@
                         <td>
                             {% if 'Sexe' in eleve.donnees_additionnelles %}
                                 {{ eleve.donnees_additionnelles.Sexe }}
+                            {% elif 'sexe' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.sexe }}
                             {% elif 'Genre' in eleve.donnees_additionnelles %}
                                 {{ eleve.donnees_additionnelles.Genre }}
+                            {% elif 'genre' in eleve.donnees_additionnelles %}
+                                {{ eleve.donnees_additionnelles.genre }}
                             {% else %}
                                 -
                             {% endif %}
@@ -596,6 +684,7 @@
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script>
 $(document).ready(function() {
     // Initialiser DataTables
@@ -668,7 +757,7 @@ $(document).ready(function() {
         data: {
             labels: [{% for label in stats.moyennes_par_niveau.labels %}"{{ label }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
             datasets: [{
-                label: 'Moyenne générale',
+                label: 'Moyenne générale par niveau',
                 data: [{% for val in stats.moyennes_par_niveau.data %}{{ val }}{% if not forloop.last %}, {% endif %}{% endfor %}],
                 backgroundColor: 'rgba(59, 125, 221, 0.7)',
                 borderColor: '#3b7ddd',
@@ -690,7 +779,20 @@ $(document).ready(function() {
             },
             plugins: {
                 legend: {
-                    display: false
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            return tooltipItems[0].label;
+                        },
+                        label: function(context) {
+                            var label = context.dataset.label || '';
+                            var value = context.raw || 0;
+                            return `${label}: ${value.toFixed(2)}`;
+                        }
+                    }
                 }
             }
         }
@@ -726,10 +828,7 @@ $(document).ready(function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'right',
-                    labels: {
-                        boxWidth: 12
-                    }
+                    display: false
                 },
                 tooltip: {
                     callbacks: {
@@ -758,10 +857,53 @@ function resetFilters() {
     document.getElementById('filtres-form').submit();
 }
 
-// Fonction pour exporter le tableau en CSV
+// Fonction pour exporter le tableau en CSV avec en-tête d'informations
 function downloadTableAsCSV() {
-    const table = document.getElementById('table-moyennes');
+    // Récupérer les informations de filtrage et d'établissement
+    const etablissementInfo = document.getElementById('etablissement-info').dataset;
+    const filtreInfo = document.getElementById('filtre-info').dataset;
+    
     let csv = [];
+    
+    // Ajouter les informations d'en-tête
+    csv.push('"Système d\'Analyse Académique Local"');
+    csv.push('"Analyse des moyennes - Semestre 1"');
+    csv.push('"' + new Date().toLocaleDateString() + '"');
+    csv.push('""');
+    
+    // Informations sur l'établissement et l'année scolaire
+    csv.push('"Établissement: ' + etablissementInfo.nom + '"');
+    csv.push('"Année scolaire: ' + etablissementInfo.anneeScolaire + '"');
+    
+    // Informations sur les filtres appliqués
+    csv.push('"Filtres appliqués:"');
+    if (filtreInfo.niveau) csv.push('"Niveau: ' + filtreInfo.niveau + '"');
+    if (filtreInfo.classe) csv.push('"Classe: ' + filtreInfo.classe + '"');
+    if (filtreInfo.sexe) csv.push('"Sexe: ' + (filtreInfo.sexe === 'M' ? 'Masculin' : 'Féminin') + '"');
+    if (filtreInfo.intervalle) {
+        let intervalleLabel = '';
+        switch(filtreInfo.intervalle) {
+            case 'excellence': intervalleLabel = 'Excellence (≥ 16)'; break;
+            case 'tres_bien': intervalleLabel = 'Très bien (14-15.99)'; break;
+            case 'bien': intervalleLabel = 'Bien (12-13.99)'; break;
+            case 'assez_bien': intervalleLabel = 'Assez bien (10-11.99)'; break;
+            case 'passable': intervalleLabel = 'Passable (8-9.99)'; break;
+            case 'insuffisant': intervalleLabel = 'Insuffisant (< 8)'; break;
+        }
+        csv.push('"Intervalle: ' + intervalleLabel + '"');
+    }
+    csv.push('""');
+    
+    // Statistiques de synthèse
+    const statsInfo = document.getElementById('stats-info').dataset;
+    csv.push('"Statistiques de synthèse:"');
+    csv.push('"Effectif total: ' + statsInfo.effectif + '"');
+    csv.push('"Moyenne générale: ' + statsInfo.moyenneGenerale + '"');
+    csv.push('"Taux de réussite: ' + statsInfo.tauxReussite + '%"');
+    csv.push('""');
+    
+    // Données du tableau
+    const table = document.getElementById('table-moyennes');
     const rows = table.querySelectorAll('tr');
     
     for (let i = 0; i < rows.length; i++) {
@@ -783,7 +925,13 @@ function downloadTableAsCSV() {
     const csvFile = new Blob([csv.join('\n')], {type: 'text/csv'});
     const downloadLink = document.createElement('a');
     
-    downloadLink.download = 'Analyse_Moyennes_S1_' + new Date().toISOString().slice(0,10) + '.csv';
+    // Nom du fichier avec date et informations de filtre
+    let fileName = 'Analyse_Moyennes_S1_' + new Date().toISOString().slice(0,10);
+    if (filtreInfo.classe) fileName += '_' + filtreInfo.classe.replace(/\s+/g, '_');
+    if (filtreInfo.niveau) fileName += '_' + filtreInfo.niveau.replace(/\s+/g, '_');
+    fileName += '.csv';
+    
+    downloadLink.download = fileName;
     downloadLink.href = window.URL.createObjectURL(csvFile);
     downloadLink.style.display = 'none';
     
@@ -792,10 +940,122 @@ function downloadTableAsCSV() {
     document.body.removeChild(downloadLink);
 }
 
-// Fonction pour imprimer le tableau
+// Fonction pour exporter en Excel (XLSX)
+function downloadTableAsExcel() {
+    // Récupérer les informations de filtrage et d'établissement
+    const etablissementInfo = document.getElementById('etablissement-info').dataset;
+    const filtreInfo = document.getElementById('filtre-info').dataset;
+    const statsInfo = document.getElementById('stats-info').dataset;
+    
+    // Création d'un nouveau workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Données d'en-tête
+    const headerData = [
+        ['Système d\'Analyse Académique Local'],
+        ['Analyse des moyennes - Semestre 1'],
+        [new Date().toLocaleDateString()],
+        [''],
+        ['Établissement:', etablissementInfo.nom],
+        ['Année scolaire:', etablissementInfo.anneeScolaire],
+        [''],
+        ['Filtres appliqués:']
+    ];
+    
+    // Ajouter les filtres
+    if (filtreInfo.niveau) headerData.push(['Niveau:', filtreInfo.niveau]);
+    if (filtreInfo.classe) headerData.push(['Classe:', filtreInfo.classe]);
+    if (filtreInfo.sexe) headerData.push(['Sexe:', filtreInfo.sexe === 'M' ? 'Masculin' : 'Féminin']);
+    if (filtreInfo.intervalle) {
+        let intervalleLabel = '';
+        switch(filtreInfo.intervalle) {
+            case 'excellence': intervalleLabel = 'Excellence (≥ 16)'; break;
+            case 'tres_bien': intervalleLabel = 'Très bien (14-15.99)'; break;
+            case 'bien': intervalleLabel = 'Bien (12-13.99)'; break;
+            case 'assez_bien': intervalleLabel = 'Assez bien (10-11.99)'; break;
+            case 'passable': intervalleLabel = 'Passable (8-9.99)'; break;
+            case 'insuffisant': intervalleLabel = 'Insuffisant (< 8)'; break;
+        }
+        headerData.push(['Intervalle:', intervalleLabel]);
+    }
+    
+    headerData.push(['']);
+    headerData.push(['Statistiques de synthèse:']);
+    headerData.push(['Effectif total:', statsInfo.effectif]);
+    headerData.push(['Moyenne générale:', statsInfo.moyenneGenerale]);
+    headerData.push(['Taux de réussite:', statsInfo.tauxReussite + '%']);
+    headerData.push(['']);
+    
+    // Créer une feuille pour les en-têtes
+    const wsInfo = XLSX.utils.aoa_to_sheet(headerData);
+    
+    // Récupérer les données du tableau
+    const table = document.getElementById('table-moyennes');
+    const wsData = XLSX.utils.table_to_sheet(table);
+    
+    // Ajuster le range pour commencer après les en-têtes
+    const range = XLSX.utils.decode_range(wsData['!ref']);
+    const headerRows = headerData.length;
+    
+    // Créer une nouvelle feuille pour les données combinées
+    const ws = XLSX.utils.aoa_to_sheet(headerData);
+    
+    // Placer les données du tableau après les en-têtes
+    for (let R = 0; R <= range.e.r; ++R) {
+        for (let C = 0; C <= range.e.c; ++C) {
+            const cell_address = XLSX.utils.encode_cell({r:R, c:C});
+            if(!wsData[cell_address]) continue;
+            
+            const new_address = XLSX.utils.encode_cell({r:R+headerRows, c:C});
+            ws[new_address] = wsData[cell_address];
+        }
+    }
+    
+    // Ajuster le range de la feuille
+    const new_range = XLSX.utils.decode_range(ws['!ref']);
+    new_range.e.r = range.e.r + headerRows;
+    ws['!ref'] = XLSX.utils.encode_range(new_range);
+    
+    // Ajouter la feuille au workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Moyennes Semestre 1");
+    
+    // Nom du fichier avec date et informations de filtre
+    let fileName = 'Analyse_Moyennes_S1_' + new Date().toISOString().slice(0,10);
+    if (filtreInfo.classe) fileName += '_' + filtreInfo.classe.replace(/\s+/g, '_');
+    if (filtreInfo.niveau) fileName += '_' + filtreInfo.niveau.replace(/\s+/g, '_');
+    fileName += '.xlsx';
+    
+    // Exporter le fichier
+    XLSX.writeFile(wb, fileName);
+}
+
+// Fonction pour imprimer le tableau avec en-tête d'informations
 function printTable() {
+    // Récupérer les informations de filtrage et d'établissement
+    const etablissementInfo = document.getElementById('etablissement-info').dataset;
+    const filtreInfo = document.getElementById('filtre-info').dataset;
+    const statsInfo = document.getElementById('stats-info').dataset;
+    
     const printContents = document.getElementById('table-moyennes').outerHTML;
     const originalContents = document.body.innerHTML;
+    
+    // Construire la section d'informations pour l'impression
+    let filterInfoHtml = '';
+    if (filtreInfo.niveau) filterInfoHtml += '<div><strong>Niveau:</strong> ' + filtreInfo.niveau + '</div>';
+    if (filtreInfo.classe) filterInfoHtml += '<div><strong>Classe:</strong> ' + filtreInfo.classe + '</div>';
+    if (filtreInfo.sexe) filterInfoHtml += '<div><strong>Sexe:</strong> ' + (filtreInfo.sexe === 'M' ? 'Masculin' : 'Féminin') + '</div>';
+    if (filtreInfo.intervalle) {
+        let intervalleLabel = '';
+        switch(filtreInfo.intervalle) {
+            case 'excellence': intervalleLabel = 'Excellence (≥ 16)'; break;
+            case 'tres_bien': intervalleLabel = 'Très bien (14-15.99)'; break;
+            case 'bien': intervalleLabel = 'Bien (12-13.99)'; break;
+            case 'assez_bien': intervalleLabel = 'Assez bien (10-11.99)'; break;
+            case 'passable': intervalleLabel = 'Passable (8-9.99)'; break;
+            case 'insuffisant': intervalleLabel = 'Insuffisant (< 8)'; break;
+        }
+        filterInfoHtml += '<div><strong>Intervalle:</strong> ' + intervalleLabel + '</div>';
+    }
     
     document.body.innerHTML = `
         <html>
@@ -803,16 +1063,51 @@ function printTable() {
                 <title>Analyse des moyennes - Semestre 1</title>
                 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
                 <style>
-                    body { padding: 20px; }
-                    h1 { font-size: 18px; margin-bottom: 20px; }
+                    body { padding: Opx; }
+                    h1 { font-size: 18px; margin-bottom: 10px; }
                     .print-header { margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f8f9fa; }
+                    .header-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
+                    .info-section { margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 5px; padding: 10px; background-color: #f8f9fa; }
+                    .info-title { font-weight: bold; margin-bottom: 5px; }
+                    @media print {
+                        .page-break { page-break-before: always; }
+                    }
                 </style>
             </head>
             <body>
                 <div class="print-header">
-                    <h1>Analyse des moyennes - Semestre 1</h1>
-                    <p>Date d'impression: ${new Date().toLocaleDateString()}</p>
+                    <div class="header-info">
+                        <div>
+                            <h1>SAAL - Analyse des moyennes - Semestre 1</h1>
+                            <div>${etablissementInfo.nom}</div>
+                            <div>Année scolaire: ${etablissementInfo.anneeScolaire}</div>
+                        </div>
+                        <div>
+                            <div>Date d'impression: ${new Date().toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-section">
+                                <div class="info-title">Filtres appliqués</div>
+                                ${filterInfoHtml}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-section">
+                                <div class="info-title">Statistiques</div>
+                                <div><strong>Effectif total:</strong> ${statsInfo.effectif}</div>
+                                <div><strong>Moyenne générale:</strong> ${statsInfo.moyenneGenerale}</div>
+                                <div><strong>Taux de réussite:</strong> ${statsInfo.tauxReussite}%</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                
                 ${printContents}
             </body>
         </html>
