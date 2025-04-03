@@ -199,27 +199,24 @@
                         <!-- Statistiques générales -->
                         <div class="col-md-3">
                             <div class="card stat-card h-100">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center mb-3">
+                                <div class="card-body p-3">
+                                    <div class="d-flex align-items-center mb-2">
                                         <div class="stat-icon bg-light-primary me-3">
                                             <i class="fas fa-users"></i>
                                         </div>
                                         <div>
-                                            <h6 class="text-muted mb-0 small">Nombre d'élèves</h6>
+                                            <h6 class="text-muted mb-0 small">Effectif total</h6>
                                             <h3 class="fw-bold mb-0">{{ stats_discipline.nombre_eleves }}</h3>
                                         </div>
                                     </div>
-                                    <div class="progress progress-sm mb-2">
-                                        <div class="progress-bar bg-primary" style="width: 100%"></div>
-                                    </div>
-                                    {% if stats_discipline.repartition_sexe %}
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="small text-muted">
-                                            <i class="fas fa-male text-primary"></i> {{ stats_discipline.repartition_sexe.M }}
+                                            <i class="fas fa-male text-primary"></i> {{ stats_discipline.repartition_sexe.M }} 
+                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.M|div:stats_discipline.nombre_eleves|floatformat:1 }}{% else %}0{% endif %}%)
                                             <i class="fas fa-female text-danger ms-2"></i> {{ stats_discipline.repartition_sexe.F }}
+                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.F|div:stats_discipline.nombre_eleves|floatformat:1 }}{% else %}0{% endif %}%)
                                         </span>
                                     </div>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -258,16 +255,22 @@
                                         </div>
                                         <div>
                                             <h6 class="text-muted mb-0 small">Taux de réussite</h6>
-                                            <h3 class="fw-bold mb-0">{{ stats_discipline.taux_reussite|floatformat:1 }}%</h3>
+                                            <h3 class="fw-bold mb-0">{{ stats_discipline.taux_reussite.total }}%</h3>
                                         </div>
                                     </div>
                                     <div class="progress progress-sm mb-2">
-                                        <div class="progress-bar bg-success" style="width: {{ stats_discipline.taux_reussite }}%"></div>
+                                        <div class="progress-bar bg-success" style="width: {{ stats_discipline.taux_reussite.total }}%"></div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="small text-muted">Élèves ≥ 10</span>
-                                        <span class="badge {% if stats_discipline.taux_reussite >= 70 %}bg-success{% elif stats_discipline.taux_reussite >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
-                                            {{ stats_discipline.taux_reussite|floatformat:1 }}%
+                                        <span class="small text-muted">
+                                            <i class="fas fa-male text-primary me-1"></i>
+                                            {{ stats_discipline.taux_reussite.par_sexe.M_taux }}% 
+                                            ({{ stats_discipline.taux_reussite.par_sexe.M }} / {{ stats_discipline.repartition_sexe.M }})
+                                        </span>
+                                        <span class="small text-muted">
+                                            <i class="fas fa-female text-danger me-1"></i>
+                                            {{ stats_discipline.taux_reussite.par_sexe.F_taux }}% 
+                                            ({{ stats_discipline.taux_reussite.par_sexe.F }} / {{ stats_discipline.repartition_sexe.F }})
                                         </span>
                                     </div>
                                 </div>
@@ -364,7 +367,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    {% if donnees_discipline|length > 0 %}
+                    {% if donnees_discipline %}
                     <div class="mb-2">
                         {% for eleve in donnees_discipline|slice:":5" %}
                         <div class="top-student-card">
@@ -378,8 +381,18 @@
                             <div class="small text-muted ps-4 mt-1">
                                 {% if eleve.classe_obj %}
                                     {{ eleve.classe_obj.nom }} ({{ eleve.classe_obj.niveau.nom }})
+                                {% elif eleve.classe %}
+                                    {{ eleve.classe }}
                                 {% else %}
-                                    {{ eleve.classe|default:"Classe non spécifiée" }}
+                                    Classe non spécifiée
+                                {% endif %}
+                                | 
+                                {% if eleve.sexe == 'M' %}
+                                    <i class="fas fa-male text-primary"></i> Masculin
+                                {% elif eleve.sexe == 'F' %}
+                                    <i class="fas fa-female text-danger"></i> Féminin
+                                {% else %}
+                                    Sexe non précisé
                                 {% endif %}
                             </div>
                         </div>
@@ -391,6 +404,7 @@
                 </div>
             </div>
         </div>
+    
         <!-- Tableau des élèves -->
         <div class="col-md-12">
             <div class="card shadow-sm">
@@ -418,6 +432,7 @@
                                     <th>Nom</th>
                                     <th>Prénom</th>
                                     <th>Classe</th>
+                                    <th>Niveau</th>
                                     <th>Sexe</th>
                                     <th class="text-center">Note</th>
                                     <th>Appréciation</th>
@@ -428,19 +443,52 @@
                                 <tr>
                                     <td>{{ eleve.rang }}</td>
                                     <td>{{ eleve.nom }}</td>
-                                    <td>{{ eleve.prenom|default:'-' }}</td>
-                                    <td>{{ eleve.classe|default:'-' }}</td>
                                     <td>
-                                        {% if 'Sexe' in eleve.disciplines %}
-                                            {{ eleve.disciplines|get_item:'Sexe' }}
-                                        {% elif 'sexe' in eleve.disciplines %}
-                                            {{ eleve.disciplines|get_item:'sexe' }}
-                                        {% elif 'Genre' in eleve.disciplines %}
-                                            {{ eleve.disciplines|get_item:'Genre' }}
-                                        {% elif 'genre' in eleve.disciplines %}
-                                            {{ eleve.disciplines|get_item:'genre' }}
+                                        {% if eleve.prenom %}
+                                            {{ eleve.prenom }}
+                                        {% elif eleve.disciplines %}
+                                            {% with prenom=None %}
+                                                {% for key in 'Prénom,prenom,PRENOM'|split:',' %}
+                                                    {% if key in eleve.disciplines and eleve.disciplines|get_item:key %}
+                                                        {% with prenom=eleve.disciplines|get_item:key %}
+                                                            {{ prenom }}
+                                                        {% endwith %}
+                                                        {% comment %}Exit the loop effectively{% endcomment %}
+                                                        {% if prenom %}{% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {% if not prenom %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
                                         {% else %}
                                             -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if eleve.classe_obj %}
+                                            {{ eleve.classe_obj.nom }}
+                                        {% elif eleve.classe %}
+                                            {{ eleve.classe }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if eleve.classe_obj and eleve.classe_obj.niveau %}
+                                            {{ eleve.classe_obj.niveau.nom }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if eleve.sexe == 'M' %}
+                                            <i class="fas fa-male text-primary me-1"></i>Masculin
+                                        {% elif eleve.sexe == 'F' %}
+                                            <i class="fas fa-female text-danger me-1"></i>Féminin
+                                        {% else %}
+                                            Non précisé
                                         {% endif %}
                                     </td>
                                     <td class="text-center">
