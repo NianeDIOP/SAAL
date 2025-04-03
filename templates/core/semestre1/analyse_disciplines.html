@@ -88,7 +88,7 @@
         padding: 0.35em 0.8em;
     }
 </style>
-{% endblock %}
+{% endblock extra_css %}
 
 {% block semestre1_title %}Analyse des disciplines - Semestre 1{% endblock %}
 {% block semestre1_subtitle %}
@@ -371,11 +371,17 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <span class="badge bg-primary badge-rounded">{{ eleve.rang }}</span>
-                                    <span class="ms-2 fw-bold">{{ eleve.nom }} {{ eleve.prenom|default:"" }}</span>
+                                    <span class="ms-2 fw-bold">{{ eleve.nom }} {% if eleve.prenom %}{{ eleve.prenom }}{% endif %}</span>
                                 </div>
                                 <span class="fw-bold">{{ eleve.moyenne_discipline|floatformat:2 }}</span>
                             </div>
-                            <div class="small text-muted ps-4 mt-1">{{ eleve.classe|default:"Classe non spécifiée" }}</div>
+                            <div class="small text-muted ps-4 mt-1">
+                                {% if eleve.classe_obj %}
+                                    {{ eleve.classe_obj.nom }} ({{ eleve.classe_obj.niveau.nom }})
+                                {% else %}
+                                    {{ eleve.classe|default:"Classe non spécifiée" }}
+                                {% endif %}
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -475,7 +481,7 @@
     Veuillez sélectionner une discipline pour commencer l'analyse. Si aucune discipline n'apparaît dans la liste déroulante, assurez-vous d'avoir importé un fichier Excel contenant des données dans l'onglet "Données détaillées".
 </div>
 {% endif %}
-{% endblock %}
+{% endblock semestre1_content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
@@ -636,7 +642,6 @@ function printTable() {
                     table { width: 100%; border-collapse: collapse; }
                     th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
                     th { background-color: #f2f2f2; }
-                    
                     .stats-box {
                         display: flex;
                         gap: 20px;
@@ -739,4 +744,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %}
+{% endblock extra_js %}
