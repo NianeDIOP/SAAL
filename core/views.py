@@ -313,19 +313,7 @@ def semestre1_importation(request):
                         rang = None
                 
                 # Création de l'entrée dans DonneesMoyennesEleves si le nom existe
-                if nom:
-                    DonneesMoyennesEleves.objects.create(
-                        import_fichier=import_fichier,
-                        nom=nom,
-                        prenom=prenom,
-                        classe_texte=classe_texte,
-                        classe_obj=classe_obj,
-                        niveau=niveau_obj,
-                        moyenne_generale=moyenne_generale,
-                        rang_classe=rang,  # Utiliser la valeur nettoyée
-                        effectif_classe=classe_obj.effectif if classe_obj else None,
-                        donnees_additionnelles=donnees_add
-                    )
+
                     
                     # Créer également une entrée dans MoyenneEleve pour maintenir la compatibilité
                     # avec les vues d'analyse existantes
@@ -569,6 +557,18 @@ def semestre1_importation_delete(request, import_id):
     
     return render(request, 'core/semestre1/importation_delete.html', context)
 
+from django.shortcuts import render
+from django.db.models import Q, FloatField
+from django.db.models.functions import Cast
+
+from .models import (
+    Etablissement, 
+    Classe, 
+    Niveau, 
+    ImportFichier, 
+    DonneesMoyennesEleves
+)
+
 def semestre1_analyse_moyennes(request):
     """
     Vue pour l'analyse des moyennes du Semestre 1, basée uniquement sur l'onglet 'Moyennes eleves'
@@ -614,7 +614,6 @@ def semestre1_analyse_moyennes(request):
     
     # Filtrer par sexe
     if sexe:
-        from django.db.models import Q
         sexe_filter = Q()
         
         if sexe == 'M':
@@ -889,7 +888,7 @@ def semestre1_analyse_moyennes(request):
                 stats['moyennes_par_niveau']['data'].append(round(moy, 2))
         
         # 7. Top 5 des élèves
-        top_eleves = donnees_moyennes[:5] if len(donnees_moyennes) >= 5 else donnees_moyennes
+        top_eleves = donnees_moyennes[:5] if len(donnees_moyennes) >=5 else donnees_moyennes
 
         # Ajouter rang pour affichage
         for i, d in enumerate(top_eleves):
