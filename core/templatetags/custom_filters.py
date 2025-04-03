@@ -14,7 +14,20 @@ def get_item(dictionary, key):
 def div(value, arg):
     """Divise la valeur par l'argument"""
     try:
-        return float(value) * 100 / float(arg)
+        return float(value) / float(arg)
     except (ValueError, ZeroDivisionError):
         return 0
-    
+
+@register.filter
+def mul(value, arg):
+    """Multiplie la valeur par l'argument"""
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+@stringfilter
+def split(value, arg):
+    """Divise une chaîne par un séparateur et renvoie une liste"""
+    return value.split(arg)

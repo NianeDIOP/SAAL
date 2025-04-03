@@ -34,15 +34,69 @@
     .distribution-bar:hover {
         transform: scale(1.05);
     }
+    
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 24px;
+    }
+    
+    .bg-light-primary {
+        background-color: rgba(59, 125, 221, 0.1);
+        color: #3b7ddd;
+    }
+    
+    .bg-light-success {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .bg-light-danger {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    
+    .bg-light-warning {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+    
+    .bg-light-info {
+        background-color: rgba(13, 202, 240, 0.1);
+        color: #0dcaf0;
+    }
+    
+    .top-student-card {
+        border-radius: 8px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        background-color: rgba(59, 125, 221, 0.05);
+        transition: all 0.2s ease;
+    }
+    
+    .top-student-card:hover {
+        transform: translateX(5px);
+        background-color: rgba(59, 125, 221, 0.1);
+    }
+    
+    .badge-rounded {
+        border-radius: 30px;
+        padding: 0.35em 0.8em;
+    }
 </style>
 {% endblock %}
 
 {% block semestre1_title %}Analyse des disciplines - Semestre 1{% endblock %}
 {% block semestre1_subtitle %}
-    Année scolaire {{ etablissement.annee_scolaire_active }}
+    Analyse détaillée par discipline pour l'année scolaire {{ etablissement.annee_scolaire_active }}
 {% endblock %}
 
 {% block semestre1_content %}
+{% if debug_mode %}
 <!-- Débogage des disciplines disponibles -->
 <div class="alert alert-info mb-3">
     <strong>Disciplines disponibles ({{ disciplines_disponibles|length }}) :</strong>
@@ -54,6 +108,7 @@
         {% endfor %}
     </ul>
 </div>
+{% endif %}
 
 <!-- Filtres -->
 <div class="card shadow-sm mb-4">
@@ -127,7 +182,6 @@
         </form>
     </div>
 </div>
-
 <!-- Contenu principal -->
 {% if selected_discipline %}
     {% if donnees_discipline %}
@@ -141,45 +195,107 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row g-3">
                         <!-- Statistiques générales -->
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="card stat-card h-100">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center mb-3">
-                                        <i class="fas fa-chart-line discipline-stat-icon me-3"></i>
-                                        <h6 class="card-title mb-0">Statistiques principales</h6>
+                                        <div class="stat-icon bg-light-primary me-3">
+                                            <i class="fas fa-users"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="text-muted mb-0 small">Nombre d'élèves</h6>
+                                            <h3 class="fw-bold mb-0">{{ stats_discipline.nombre_eleves }}</h3>
+                                        </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-6 mb-2">
-                                            <small class="text-muted d-block">Nombre d'élèves</small>
-                                            <strong>{{ stats_discipline.nombre_eleves }}</strong>
+                                    <div class="progress progress-sm mb-2">
+                                        <div class="progress-bar bg-primary" style="width: 100%"></div>
+                                    </div>
+                                    {% if stats_discipline.repartition_sexe %}
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">
+                                            <i class="fas fa-male text-primary"></i> {{ stats_discipline.repartition_sexe.M }}
+                                            <i class="fas fa-female text-danger ms-2"></i> {{ stats_discipline.repartition_sexe.F }}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Moyenne de la discipline -->
+                        <div class="col-md-3">
+                            <div class="card stat-card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="stat-icon bg-light-info me-3">
+                                            <i class="fas fa-calculator"></i>
                                         </div>
-                                        <div class="col-6 mb-2">
-                                            <small class="text-muted d-block">Moyenne générale</small>
-                                            <strong>{{ stats_discipline.moyenne_globale|floatformat:2 }}</strong>
+                                        <div>
+                                            <h6 class="text-muted mb-0 small">Moyenne générale</h6>
+                                            <h3 class="fw-bold mb-0">{{ stats_discipline.moyenne_globale|floatformat:2 }}</h3>
                                         </div>
-                                        <div class="col-6">
-                                            <small class="text-muted d-block">Note minimale</small>
-                                            <strong>{{ stats_discipline.min_moyenne|floatformat:2 }}</strong>
-                                        </div>
-                                        <div class="col-6">
-                                            <small class="text-muted d-block">Note maximale</small>
-                                            <strong>{{ stats_discipline.max_moyenne|floatformat:2 }}</strong>
-                                        </div>
+                                    </div>
+                                    <div class="progress progress-sm mb-2">
+                                        <div class="progress-bar bg-info" style="width: {% if stats_discipline.moyenne_globale <= 20 %}{{ stats_discipline.moyenne_globale|div:20|mul:100 }}{% else %}100{% endif %}%"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">Min: {{ stats_discipline.min_moyenne|floatformat:2 }}</span>
+                                        <span class="small text-muted">Max: {{ stats_discipline.max_moyenne|floatformat:2 }}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Distribution des notes -->
-                        <div class="col-md-8">
+                        <!-- Taux de réussite -->
+                        <div class="col-md-3">
                             <div class="card stat-card h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title mb-3">
-                                        <i class="fas fa-chart-bar me-2 text-primary"></i>Distribution des notes
-                                    </h6>
-                                    <canvas id="distributionChart" class="chart-container"></canvas>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="stat-icon bg-light-success me-3">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="text-muted mb-0 small">Taux de réussite</h6>
+                                            <h3 class="fw-bold mb-0">{{ stats_discipline.taux_reussite|floatformat:1 }}%</h3>
+                                        </div>
+                                    </div>
+                                    <div class="progress progress-sm mb-2">
+                                        <div class="progress-bar bg-success" style="width: {{ stats_discipline.taux_reussite }}%"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">Élèves ≥ 10</span>
+                                        <span class="badge {% if stats_discipline.taux_reussite >= 70 %}bg-success{% elif stats_discipline.taux_reussite >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ stats_discipline.taux_reussite|floatformat:1 }}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Dispersion -->
+                        <div class="col-md-3">
+                            <div class="card stat-card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="stat-icon bg-light-warning me-3">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="text-muted mb-0 small">Écart type</h6>
+                                            <h3 class="fw-bold mb-0">{{ stats_discipline.ecart_type|floatformat:2 }}</h3>
+                                        </div>
+                                    </div>
+                                    <div class="progress progress-sm mb-2">
+                                        <div class="progress-bar bg-warning" style="width: {% if stats_discipline.ecart_type <= 5 %}{{ stats_discipline.ecart_type|div:5|mul:100 }}{% else %}100{% endif %}%"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">Médiane: {{ stats_discipline.mediane|floatformat:2 }}</span>
+                                        <span class="small text-muted">
+                                            {% if stats_discipline.ecart_type < 2 %}Homogène{% elif stats_discipline.ecart_type < 4 %}Moyenne{% else %}Dispersée{% endif %}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -188,6 +304,87 @@
             </div>
         </div>
         
+        <!-- Distribution des notes -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-chart-bar me-2"></i>Distribution des notes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="distributionChart" class="chart-container"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mt-2 mb-3">
+                                <h6 class="mb-3">Répartition</h6>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Excellent (16-20)</span>
+                                    <span class="badge bg-primary">{{ distribution_notes.data.6 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Très bien (14-16)</span>
+                                    <span class="badge bg-success">{{ distribution_notes.data.5 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Bien (12-14)</span>
+                                    <span class="badge bg-info">{{ distribution_notes.data.4 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Assez bien (10-12)</span>
+                                    <span class="badge bg-warning">{{ distribution_notes.data.3 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Passable (8-10)</span>
+                                    <span class="badge bg-secondary">{{ distribution_notes.data.2 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Insuffisant (4-8)</span>
+                                    <span class="badge bg-danger">{{ distribution_notes.data.1 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Très faible (0-4)</span>
+                                    <span class="badge bg-dark">{{ distribution_notes.data.0 }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top 5 élèves -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-trophy me-2"></i>Top 5 des meilleurs élèves
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if donnees_discipline|length > 0 %}
+                    <div class="mb-2">
+                        {% for eleve in donnees_discipline|slice:":5" %}
+                        <div class="top-student-card">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-primary badge-rounded">{{ eleve.rang }}</span>
+                                    <span class="ms-2 fw-bold">{{ eleve.nom }} {{ eleve.prenom|default:"" }}</span>
+                                </div>
+                                <span class="fw-bold">{{ eleve.moyenne_discipline|floatformat:2 }}</span>
+                            </div>
+                            <div class="small text-muted ps-4 mt-1">{{ eleve.classe|default:"Classe non spécifiée" }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-center text-muted my-4">Aucune donnée disponible</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
         <!-- Tableau des élèves -->
         <div class="col-md-12">
             <div class="card shadow-sm">
@@ -211,30 +408,50 @@
                         <table id="notes-table" class="table table-striped table-hover">
                             <thead>
                                 <tr>
+                                    <th>Rang</th>
                                     <th>Nom</th>
                                     <th>Prénom</th>
                                     <th>Classe</th>
-                                    <th class="text-end">Note</th>
-                                    <th>Informations supplémentaires</th>
+                                    <th>Sexe</th>
+                                    <th class="text-center">Note</th>
+                                    <th>Appréciation</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for eleve in donnees_discipline %}
                                 <tr>
+                                    <td>{{ eleve.rang }}</td>
                                     <td>{{ eleve.nom }}</td>
                                     <td>{{ eleve.prenom|default:'-' }}</td>
                                     <td>{{ eleve.classe|default:'-' }}</td>
-                                    <td class="text-end fw-bold">
-                                        {% with discipline_key=selected_discipline|add:" Moy D" %}
-                                            {{ eleve.disciplines|get_item:discipline_key|default:"0.00"|floatformat:2 }}
-                                        {% endwith %}
+                                    <td>
+                                        {% if 'Sexe' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'Sexe' }}
+                                        {% elif 'sexe' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'sexe' }}
+                                        {% elif 'Genre' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'Genre' }}
+                                        {% elif 'genre' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'genre' }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge {% if eleve.moyenne_discipline >= 14 %}bg-success{% elif eleve.moyenne_discipline >= 10 %}bg-primary{% elif eleve.moyenne_discipline >= 8 %}bg-warning{% else %}bg-danger{% endif %} badge-rounded">
+                                            {{ eleve.moyenne_discipline|floatformat:2 }}
+                                        </span>
                                     </td>
                                     <td>
-                                        {% for key, value in eleve.disciplines.items %}
-                                            {% if key != selected_discipline|add:" Moy D" and value %}
-                                                <span class="badge bg-secondary me-1">{{ key }}: {{ value }}</span>
-                                            {% endif %}
-                                        {% endfor %}
+                                        {% if 'Appréciation' in eleve.disciplines %}
+                                            {{ eleve.disciplines.Appréciation }}
+                                        {% elif 'Appreciation' in eleve.disciplines %}
+                                            {{ eleve.disciplines.Appreciation }}
+                                        {% elif 'appreciation' in eleve.disciplines %}
+                                            {{ eleve.disciplines.appreciation }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -249,13 +466,13 @@
     <div class="alert alert-warning">
         <i class="fas fa-exclamation-triangle me-2"></i>
         Aucune donnée trouvée pour la discipline "{{ selected_discipline }}". 
-        Veuillez ajuster vos filtres.
+        Veuillez ajuster vos filtres ou vérifier que cette discipline comporte des notes dans l'onglet "Données détaillées" du fichier Excel importé.
     </div>
     {% endif %}
 {% else %}
 <div class="alert alert-info">
     <i class="fas fa-info-circle me-2"></i>
-    Veuillez sélectionner une discipline pour commencer l'analyse.
+    Veuillez sélectionner une discipline pour commencer l'analyse. Si aucune discipline n'apparaît dans la liste déroulante, assurez-vous d'avoir importé un fichier Excel contenant des données dans l'onglet "Données détaillées".
 </div>
 {% endif %}
 {% endblock %}
@@ -272,8 +489,10 @@ $(document).ready(function() {
             url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
         },
         responsive: true,
-        order: [[3, 'desc']], // Trier par note décroissante
-        pageLength: 25
+        order: [[5, 'desc']], // Trier par note décroissante (colonne 5)
+        pageLength: 25,
+        dom: '<"d-flex justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex"f>>t<"d-flex justify-content-between align-items-center"<"d-flex"i><"d-flex"p>>',
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]]
     });
 
     // Distribution des notes
@@ -287,28 +506,29 @@ $(document).ready(function() {
                 label: 'Distribution des notes',
                 data: {{ distribution_notes.data|safe }},
                 backgroundColor: [
-                    'rgba(220, 53, 69, 0.6)',  // 0-4
-                    'rgba(255, 193, 7, 0.6)',   // 4-8
-                    'rgba(108, 117, 125, 0.6)', // 8-10
-                    'rgba(0, 123, 255, 0.6)',   // 10-12
-                    'rgba(40, 167, 69, 0.6)',   // 12-14
-                    'rgba(23, 162, 184, 0.6)',  // 14-16
-                    'rgba(111, 66, 193, 0.6)'   // 16-20
+                    'rgba(52, 58, 64, 0.7)',  // 0-4 (dark)
+                    'rgba(220, 53, 69, 0.7)',  // 4-8 (danger)
+                    'rgba(108, 117, 125, 0.7)', // 8-10 (secondary)
+                    'rgba(255, 193, 7, 0.7)',   // 10-12 (warning)
+                    'rgba(13, 202, 240, 0.7)',  // 12-14 (info)
+                    'rgba(40, 167, 69, 0.7)',   // 14-16 (success)
+                    'rgba(59, 125, 221, 0.7)'   // 16-20 (primary)
                 ],
                 borderColor: [
+                    'rgba(52, 58, 64, 1)',
                     'rgba(220, 53, 69, 1)',
-                    'rgba(255, 193, 7, 1)',
                     'rgba(108, 117, 125, 1)',
-                    'rgba(0, 123, 255, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(13, 202, 240, 1)',
                     'rgba(40, 167, 69, 1)',
-                    'rgba(23, 162, 184, 1)',
-                    'rgba(111, 66, 193, 1)'
+                    'rgba(59, 125, 221, 1)'
                 ],
                 borderWidth: 1
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 y: {
                     beginAtZero: true,
@@ -316,6 +536,28 @@ $(document).ready(function() {
                         display: true,
                         text: 'Nombre d\'élèves'
                     }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Intervalles de notes'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var label = context.dataset.label || '';
+                            var value = context.raw || 0;
+                            var total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            var percentage = Math.round(value / total * 100);
+                            return `${value} élève(s) (${percentage}%)`;
+                        }
+                    }
+                },
+                legend: {
+                    display: false
                 }
             }
         }
@@ -335,23 +577,41 @@ function resetFilters() {
 function exportTableToCSV() {
     const table = document.getElementById('notes-table');
     let csv = [];
+    
+    // Ajouter les informations d'en-tête
+    csv.push('"Système d\'Analyse Académique Local"');
+    csv.push('"Analyse de discipline: {{ selected_discipline }}"');
+    csv.push('"Date: ' + new Date().toLocaleDateString() + '"');
+    csv.push('""');
+    csv.push('"Statistiques:"');
+    csv.push('"Nombre d\'élèves: {{ stats_discipline.nombre_eleves }}"');
+    csv.push('"Moyenne générale: {{ stats_discipline.moyenne_globale|floatformat:2 }}"');
+    csv.push('"Taux de réussite: {{ stats_discipline.taux_reussite|floatformat:1 }}%"');
+    csv.push('""');
+    
+    // En-têtes du tableau
     const rows = table.querySelectorAll('tr');
     
     for (let i = 0; i < rows.length; i++) {
-        const row = [], cols = rows[i].querySelectorAll('td, th');
-        
-        for (let j = 0; j < cols.length; j++) {
-            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/"/g, '""');
-            row.push('"' + data + '"');
+        // Ne sélectionner que les lignes visibles (pour les filtres de dataTables)
+        if (!$(rows[i]).hasClass('d-none') && window.getComputedStyle(rows[i]).display !== 'none') {
+            const row = [], cols = rows[i].querySelectorAll('td, th');
+            
+            for (let j = 0; j < cols.length; j++) {
+                // Nettoyer les données
+                let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/"/g, '""');
+                row.push('"' + data + '"');
+            }
+            
+            csv.push(row.join(','));
         }
-        
-        csv.push(row.join(','));
     }
     
+    // Télécharger le CSV
     const csvFile = new Blob([csv.join('\n')], {type: 'text/csv'});
     const downloadLink = document.createElement('a');
     
-    downloadLink.download = 'Notes_Discipline_{{ selected_discipline }}.csv';
+    downloadLink.download = 'Notes_{{ selected_discipline }}_' + new Date().toISOString().slice(0,10) + '.csv';
     downloadLink.href = window.URL.createObjectURL(csvFile);
     downloadLink.style.display = 'none';
     
@@ -371,18 +631,62 @@ function printTable() {
                 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
                 <style>
                     body { padding: 20px; }
-                    h1 { font-size: 18px; margin-bottom: 10px; }
+                    h1 { font-size: 18px; margin-bottom: 10px; font-weight: bold; }
                     .print-header { margin-bottom: 20px; }
                     table { width: 100%; border-collapse: collapse; }
                     th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
                     th { background-color: #f2f2f2; }
+                    
+                    .stats-box {
+                        display: flex;
+                        gap: 20px;
+                        margin-bottom: 20px;
+                        border: 1px solid #ddd;
+                        padding: 10px;
+                        border-radius: 5px;
+                    }
+                    
+                    .stat-item {
+                        flex: 1;
+                        text-align: center;
+                    }
+                    
+                    .stat-value {
+                        font-size: 18px;
+                        font-weight: bold;
+                    }
+                    
+                    .stat-label {
+                        font-size: 12px;
+                        color: #555;
+                    }
                 </style>
             </head>
             <body>
                 <div class="print-header">
-                    <h1>Notes de {{ selected_discipline }} - Semestre 1</h1>
+                    <h1>Analyse de discipline : {{ selected_discipline }} - Semestre 1</h1>
                     <p>Année scolaire : {{ etablissement.annee_scolaire_active }}</p>
                     <p>Date d'impression : ${new Date().toLocaleDateString()}</p>
+                    
+                    <div class="stats-box">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats_discipline.nombre_eleves }}</div>
+                            <div class="stat-label">Élèves</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats_discipline.moyenne_globale|floatformat:2 }}</div>
+                            <div class="stat-label">Moyenne</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats_discipline.taux_reussite|floatformat:1 }}%</div>
+                            <div class="stat-label">Taux de réussite</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats_discipline.min_moyenne|floatformat:2 }} / {{ stats_discipline.max_moyenne|floatformat:2 }}</div>
+                            <div class="stat-label">Min / Max</div>
+                        </div>
+                    </div>
+                    
                     <hr>
                 </div>
                 ${printContents}
@@ -393,17 +697,46 @@ function printTable() {
     window.print();
     document.body.innerHTML = originalContents;
     
-    // Réinitialiser les fonctionnalités JavaScript
-    $(document).ready(function() {
-        $('#notes-table').DataTable({
-            language: {
-                url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
-            },
-            responsive: true,
-            order: [[3, 'desc']],
-            pageLength: 25
-        });
-    });
+    // Réinitialiser les fonctionnalités JavaScript après l'impression
+    setTimeout(function() {
+        location.reload();
+    }, 100);
 }
+
+// Script supplémentaire pour adapter l'interface utilisateur
+document.addEventListener('DOMContentLoaded', function() {
+    // Automatiquement sélectionner la première discipline disponible si aucune n'est sélectionnée
+    const disciplineSelect = document.getElementById('discipline');
+    const importSelect = document.getElementById('import');
+    
+    if (disciplineSelect && disciplineSelect.value === '' && disciplineSelect.options.length > 1 && !window.location.search.includes('discipline=')) {
+        // S'il y a un import sélectionné mais pas de discipline, proposer de sélectionner une discipline
+        if (importSelect && importSelect.value !== '') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-info mt-3';
+            alertDiv.innerHTML = '<i class="fas fa-info-circle me-2"></i> Une importation a été sélectionnée. Veuillez maintenant choisir une discipline pour visualiser les données.';
+            
+            const contentDiv = document.querySelector('.admin-content');
+            if (contentDiv) {
+                contentDiv.insertBefore(alertDiv, contentDiv.querySelector('.card'));
+            }
+        }
+    }
+    
+    // Ajouter un événement pour charger les disciplines disponibles lors du changement d'importation
+    if (importSelect) {
+        importSelect.addEventListener('change', function() {
+            if (this.value) {
+                // Mettre en surbrillance le sélecteur de discipline
+                if (disciplineSelect) {
+                    disciplineSelect.classList.add('border-primary');
+                    setTimeout(function() {
+                        disciplineSelect.classList.remove('border-primary');
+                    }, 2000);
+                }
+            }
+        });
+    }
+});
 </script>
 {% endblock %}

@@ -154,6 +154,7 @@ def semestre1_importation(request):
         try:
             import pandas as pd
             import json
+            import re  # Pour le nettoyage des valeurs non numériques
             
             # Récupérer la classe sélectionnée si une est choisie
             classe_selectionnee = None
@@ -181,38 +182,49 @@ def semestre1_importation(request):
                 header=None
             )
             
-            # Cherchez les disciplines dans les premières lignes (par exemple, ligne 6)
-            # Modifiez l'indice si nécessaire selon la structure de votre fichier
-            discipline_line = 5  # Ligne 6 (index 5)
+            # Chercher les disciplines dans les premières lignes
+            # Améliorer l'extraction des disciplines en analysant plusieurs lignes potentielles
             discipline_names = []
             
-            # Parcourir la ligne des disciplines et extraire les noms non-vides
-            for col in range(3, df_entetes.shape[1]):  # Commencez après les colonnes Nom, Prénom, Classe
-                cell_value = df_entetes.iloc[discipline_line, col]
-                if pd.notna(cell_value) and str(cell_value).strip():
-                    discipline_names.append(str(cell_value).strip())
-                    # Imprimez pour le débogage
-                    print(f"Trouvé discipline à la colonne {col}: {cell_value}")
-            
-            print(f"Noms de disciplines extraits: {discipline_names}")
+            # Parcourir les lignes 5, 6 et 4 pour trouver celle qui contient les disciplines
+            for discipline_line in [5, 6, 4]:
+                potential_disciplines = []
+                # Parcourir toutes les colonnes à partir de la 3e (après Nom, Prénom, Classe)
+                for col in range(3, df_entetes.shape[1]):
+                    cell_value = df_entetes.iloc[discipline_line, col]
+                    if pd.notna(cell_value) and str(cell_value).strip():
+                        potential_disciplines.append(str(cell_value).strip())
+                
+                # Si nous avons trouvé des disciplines potentielles, c'est probablement la bonne ligne
+                if len(potential_disciplines) > 3:  # Au moins 3 disciplines
+                    discipline_names = potential_disciplines
+                    print(f"Disciplines trouvées à la ligne {discipline_line+1}: {discipline_names}")
+                    break
             
             # --- 3) Lecture de l'onglet "Données détaillées" avec les noms corrects
+            # Lire l'onglet en considérant les 2 lignes d'en-tête fusionnées
             df_detail = pd.read_excel(
                 xls,
                 sheet_name="Données détaillées",
                 skiprows=range(8),  # Ignore les 8 premières lignes
-                header=[0, 1]  # Lit les 2 premières lignes comme en-têtes (fusionnées)
+                header=[0, 1]  # Considère les 2 premières lignes comme en-têtes 
             )
             
-            # Extraire les colonnes et sous-colonnes
-            disciplines = df_detail.columns.get_level_values(0).tolist()
-            sous_colonnes = df_detail.columns.get_level_values(1).tolist()
+            # Extraire les colonnes principales et sous-colonnes
+            disciplines = list(df_detail.columns.get_level_values(0))
+            sous_colonnes = list(df_detail.columns.get_level_values(1))
+            
+            # Remplacer les "Unnamed" dans les disciplines par la valeur précédente
+            # (effet des cellules fusionnées)
+            for i in range(len(disciplines)):
+                if "Unnamed" in str(disciplines[i]):
+                    disciplines[i] = disciplines[i-1]
             
             # --- 4) Sélectionner les 3 premières colonnes (Infos élèves)
-            info_colonnes = df_detail.iloc[:, :3]
+            info_colonnes = df_detail.iloc[:, :3].copy()
             info_colonnes.columns = [col[0] for col in info_colonnes.columns]
             
-            # Vérifier si les colonnes nécessaires sont présentes dans info_colonnes
+            # Vérifier si les colonnes nécessaires sont présentes 
             required_columns = ['Nom']
             missing_columns = [col for col in required_columns if col not in info_colonnes.columns]
             
@@ -222,34 +234,127 @@ def semestre1_importation(request):
             # Vérifier si la colonne 'Prénom' existe, sinon créer une colonne vide
             if 'Prénom' not in info_colonnes.columns:
                 info_colonnes['Prénom'] = None
-                
+            
             # --- 5) Sélectionner uniquement les colonnes "Moy D" et récupérer leurs positions
-            colonnes_moy_d = [i for i, col in enumerate(sous_colonnes) if col == "Moy D"]
-            df_detail_moy_d = df_detail.iloc[:, colonnes_moy_d]
+            colonnes_moy_d = []
+            for i, col in enumerate(sous_colonnes):
+                if str(col).strip() == "Moy D":
+                    colonnes_moy_d.append(i)
             
-            # Utiliser les vrais noms des disciplines si disponibles
-            if discipline_names and len(discipline_names) == len(colonnes_moy_d):
-                noms_moy_d = discipline_names
-                print(f"Utilisation des noms de disciplines extraits: {noms_moy_d}")
+            df_detail_moy_d = df_detail.iloc[:, colonnes_moy_d].copy()
+            
+            # Récupérer les noms des disciplines pour les colonnes "Moy D"
+            disciplines_for_moy_d = [disciplines[i] for i in colonnes_moy_d]
+            
+            # Utiliser les noms extraits des en-têtes si disponibles
+            if discipline_names and len(discipline_names) >= len(colonnes_moy_d):
+                # S'assurer que nous avons le bon nombre de disciplines
+                noms_moy_d = discipline_names[:len(colonnes_moy_d)]
+                print(f"Utilisation des disciplines extraites des en-têtes: {noms_moy_d}")
             else:
-                noms_moy_d = [disciplines[i] for i in colonnes_moy_d]
-                print(f"Utilisation des noms de colonnes par défaut: {noms_moy_d}")
+                # Sinon utiliser ceux extraits des colonnes
+                noms_moy_d = disciplines_for_moy_d
+                print(f"Utilisation des disciplines extraites des colonnes: {noms_moy_d}")
             
+            # Renommer les colonnes de moyennes avec les noms extraits
             df_detail_moy_d.columns = noms_moy_d
             
             # --- 6) Fusionner les infos élèves avec les moyennes "Moy D"
             df_final = pd.concat([info_colonnes, df_detail_moy_d], axis=1)
             
             # --- 7) Stocker les données du tableau "Moyennes eleves"
-            # [Code existant inchangé]
+            # Traitement de l'onglet "Moyennes eleves"
+            for _, row in df_moyennes.iterrows():
+                # Extraction du nom, prénom et classe
+                nom = str(row.get('Nom', ''))
+                prenom = str(row.get('Prénom', '')) if pd.notna(row.get('Prénom')) else None
+                classe_texte = str(row.get('Classe', '')) if pd.notna(row.get('Classe')) else None
+                
+                # Si la classe et le niveau ont été sélectionnés ou identifiés
+                classe_obj = None
+                niveau_obj = None
+                if classe_selectionnee:
+                    classe_obj = classe_selectionnee
+                    niveau_obj = niveau_selectionne
+                else:
+                    # Tenter de trouver la classe correspondante
+                    for c in classes:
+                        if classe_texte and c.nom in classe_texte:
+                            classe_obj = c
+                            niveau_obj = c.niveau
+                            break
+                
+                # Création des données additionnelles (autres colonnes)
+                donnees_add = {}
+                for col in df_moyennes.columns:
+                    if col not in ['Nom', 'Prénom', 'Classe', 'Moy. Gén.', 'Rang']:
+                        if pd.notna(row.get(col)):
+                            donnees_add[col] = row.get(col)
+                
+                # Extraction de la moyenne générale
+                moyenne_generale = row.get('Moy. Gén.') if pd.notna(row.get('Moy. Gén.')) else None
+                
+                # Extraction et nettoyage du rang
+                rang_brut = row.get('Rang')
+                rang = None
+                if pd.notna(rang_brut):
+                    # Vérifier si c'est un nombre valide
+                    try:
+                        # Nettoyer les valeurs potentiellement non numériques
+                        rang_str = str(rang_brut).strip()
+                        # Extraire les chiffres si la valeur contient du texte (comme "32ex")
+                        import re
+                        matches = re.match(r'(\d+)', rang_str)
+                        if matches:
+                            rang = int(matches.group(1))
+                        else:
+                            rang = None
+                    except (ValueError, TypeError):
+                        rang = None
+                
+                # Création de l'entrée dans DonneesMoyennesEleves si le nom existe
+                if nom:
+                    DonneesMoyennesEleves.objects.create(
+                        import_fichier=import_fichier,
+                        nom=nom,
+                        prenom=prenom,
+                        classe_texte=classe_texte,
+                        classe_obj=classe_obj,
+                        niveau=niveau_obj,
+                        moyenne_generale=moyenne_generale,
+                        rang_classe=rang,  # Utiliser la valeur nettoyée
+                        effectif_classe=classe_obj.effectif if classe_obj else None,
+                        donnees_additionnelles=donnees_add
+                    )
+                    
+                    # Créer également une entrée dans MoyenneEleve pour maintenir la compatibilité
+                    # avec les vues d'analyse existantes
+                    if classe_obj:
+                        moyenne_value = None
+                        if moyenne_generale is not None:
+                            try:
+                                if isinstance(moyenne_generale, str):
+                                    moyenne_value = float(moyenne_generale.replace(',', '.'))
+                                else:
+                                    moyenne_value = float(moyenne_generale)
+                            except (ValueError, TypeError):
+                                moyenne_value = None
+                        
+                        moyenne_eleve = MoyenneEleve.objects.create(
+                            import_fichier=import_fichier,
+                            nom_eleve=nom,
+                            prenom_eleve=prenom,
+                            classe=classe_obj,
+                            moyenne_generale=moyenne_value,
+                            rang=rang
+                        )
             
             # --- 8) Stocker les données du tableau "Données détaillées"
             # Extraire les noms des disciplines correctement
-            discipline_colonnes = []
-            if discipline_names and len(discipline_names) == len(colonnes_moy_d):
-                discipline_colonnes = discipline_names
-            else:
-                discipline_colonnes = [disciplines[i] for i in colonnes_moy_d]
+            discipline_colonnes = noms_moy_d
+            
+            # Créer un dictionnaire pour associer élèves et données détaillées
+            donnees_detail_par_eleve = {}
             
             for _, row in df_final.iterrows():
                 nom = str(row.get('Nom', ''))
@@ -278,22 +383,51 @@ def semestre1_importation(request):
                 
                 # Sauvegarder dans la base de données
                 if nom:  # S'assurer qu'il y a un nom
-                    DonneesDetailleesEleves.objects.create(
+                    donnees_detail = DonneesDetailleesEleves.objects.create(
                         import_fichier=import_fichier,
                         nom=nom,
                         prenom=prenom,
                         classe=classe_nom,
                         disciplines=disciplines_dict
                     )
+                    
+                    # Stocker dans le dictionnaire pour l'utiliser plus tard
+                    donnees_detail_par_eleve[(nom, prenom if prenom else '')] = disciplines_dict
             
-            # --- 9) Extraire et stocker les disciplines uniques
-            disciplines_uniques = set()
-            for discipline in discipline_colonnes:
-                disciplines_uniques.add(discipline)
+            # --- 9) Associer les moyennes de disciplines aux élèves dans MoyenneEleve
+            # Pour chaque MoyenneEleve, trouver les données détaillées correspondantes
+            # et créer les MoyenneDiscipline appropriées
+            for moyenne_eleve in MoyenneEleve.objects.filter(import_fichier=import_fichier):
+                nom = moyenne_eleve.nom_eleve
+                prenom = moyenne_eleve.prenom_eleve if moyenne_eleve.prenom_eleve else ''
+                
+                # Rechercher les données détaillées correspondantes
+                disciplines_dict = donnees_detail_par_eleve.get((nom, prenom), None)
+                
+                if disciplines_dict:
+                    # Pour chaque discipline, créer une MoyenneDiscipline
+                    for discipline in discipline_colonnes:
+                        moy_key = f"{discipline} Moy D"
+                        if moy_key in disciplines_dict:
+                            moy_value = disciplines_dict[moy_key]
+                            
+                            if pd.notna(moy_value):
+                                try:
+                                    # Convertir en float si possible
+                                    moyenne_float = float(str(moy_value).replace(',', '.'))
+                                    MoyenneDiscipline.objects.create(
+                                        eleve=moyenne_eleve,
+                                        nom_discipline=discipline,
+                                        moyenne=moyenne_float
+                                    )
+                                except (ValueError, TypeError):
+                                    # Ignorer les valeurs qui ne peuvent pas être converties
+                                    pass
             
+            # --- 10) Extraire et stocker les disciplines uniques
             # Stocker les disciplines dans les données supplémentaires de l'importation
             import_fichier.donnees_supplementaires = {
-                'disciplines': sorted(list(disciplines_uniques))
+                'disciplines': discipline_colonnes
             }
             
             # Terminer l'importation
@@ -898,13 +1032,21 @@ def semestre1_analyse_disciplines(request):
     
     if classe_id:
         classe = Classe.objects.get(id=classe_id)
-        donnees_query = donnees_query.filter(classe=classe.nom)
+        donnees_query = donnees_query.filter(classe__icontains=classe.nom)
     
     if niveau_id:
         niveau = Niveau.objects.get(id=niveau_id)
         # Trouver les classes du niveau
         classes_niveau = Classe.objects.filter(niveau=niveau)
-        donnees_query = donnees_query.filter(classe__in=[c.nom for c in classes_niveau])
+        classe_patterns = [c.nom for c in classes_niveau]
+        
+        # Utiliser Q objects pour faire un OR entre les différentes classes
+        from django.db.models import Q
+        q_objects = Q()
+        for classe_pattern in classe_patterns:
+            q_objects |= Q(classe__icontains=classe_pattern)
+        
+        donnees_query = donnees_query.filter(q_objects)
     
     # Fonction améliorée pour récupérer les disciplines disponibles
     def get_disciplines_disponibles():
@@ -915,49 +1057,25 @@ def semestre1_analyse_disciplines(request):
             try:
                 import_obj = ImportFichier.objects.get(id=import_id)
                 if import_obj.donnees_supplementaires and 'disciplines' in import_obj.donnees_supplementaires:
-                    print(f"Disciplines trouvées dans import {import_id}: {import_obj.donnees_supplementaires['disciplines']}")
-                    return import_obj.donnees_supplementaires['disciplines']
+                    return sorted(import_obj.donnees_supplementaires['disciplines'])
             except ImportFichier.DoesNotExist:
                 pass
         
-        # Sinon, récupérer les disciplines de tous les imports filtrés
-        imports_filtres = ImportFichier.objects.filter(
-            semestre=1,
-            annee_scolaire=annee_scolaire,
-            statut='termine'
-        )
+        # Sinon, analyser les données pour extraire les disciplines
+        for donnee in donnees_query:
+            for key in donnee.disciplines.keys():
+                if key.endswith(" Moy D"):
+                    discipline = key.replace(" Moy D", "").strip()
+                    disciplines.add(discipline)
         
-        if classe_id:
-            # Trouver les imports associés à cette classe
-            classe = Classe.objects.get(id=classe_id)
-            donnees_moyennes = DonneesMoyennesEleves.objects.filter(classe_obj=classe).values_list('import_fichier_id', flat=True)
-            imports_filtres = imports_filtres.filter(id__in=donnees_moyennes)
-        
-        if niveau_id:
-            # Trouver les imports associés à ce niveau
-            niveau = Niveau.objects.get(id=niveau_id)
-            donnees_moyennes = DonneesMoyennesEleves.objects.filter(niveau=niveau).values_list('import_fichier_id', flat=True)
-            imports_filtres = imports_filtres.filter(id__in=donnees_moyennes)
-        
-        # Parcourir les imports filtrés pour collecter les disciplines
-        for import_obj in imports_filtres:
-            if import_obj.donnees_supplementaires and 'disciplines' in import_obj.donnees_supplementaires:
-                print(f"Disciplines trouvées dans import {import_obj.id}: {import_obj.donnees_supplementaires['disciplines']}")
-                disciplines.update(import_obj.donnees_supplementaires['disciplines'])
-        
-        # Si aucune discipline n'est trouvée, utiliser la méthode traditionnelle
         if not disciplines:
-            print("Aucune discipline trouvée dans les imports, utilisation de la méthode traditionnelle")
-            for donnees in donnees_query:
-                for key in donnees.disciplines.keys():
-                    if key.endswith(" Moy D"):
-                        discipline = key[:-6].strip()
-                        disciplines.add(discipline)
-                        print(f"Discipline trouvée via méthode traditionnelle: {discipline}")
+            # Si aucune discipline trouvée, essayer une autre approche
+            for import_obj in imports:
+                if hasattr(import_obj, 'donnees_supplementaires') and import_obj.donnees_supplementaires:
+                    if 'disciplines' in import_obj.donnees_supplementaires:
+                        disciplines.update(import_obj.donnees_supplementaires['disciplines'])
         
-        disciplines_list = sorted(list(disciplines))
-        print(f"Liste finale des disciplines: {disciplines_list}")
-        return disciplines_list
+        return sorted(list(disciplines))
     
     # Initialiser la liste des disciplines disponibles
     disciplines_disponibles = get_disciplines_disponibles()
@@ -970,35 +1088,49 @@ def semestre1_analyse_disciplines(request):
         'data': [0, 0, 0, 0, 0, 0, 0]
     }
     
-    if discipline_selectionnee:
+    if discipline_selectionnee and disciplines_disponibles:
         # Construire la clé de moyenne pour la discipline
         moy_key = f"{discipline_selectionnee} Moy D"
+        print(f"Recherche des données avec la clé: {moy_key}")
         
-        # Filtrer les données
-        donnees_discipline = [
-            eleve for eleve in donnees_query 
-            if moy_key in eleve.disciplines and eleve.disciplines[moy_key] is not None
-        ]
+        # Filtrer les données (avec vérification plus explicite)
+        donnees_discipline = []
+        for eleve in donnees_query:
+            print(f"Élève {eleve.nom}: disciplines disponibles = {list(eleve.disciplines.keys())}")
+            if moy_key in eleve.disciplines and eleve.disciplines[moy_key] is not None:
+                # Vérifiez si la valeur peut être convertie en float
+                try:
+                    moyenne = float(eleve.disciplines[moy_key])
+                    eleve.moyenne_discipline = moyenne  # Ajouter la moyenne comme attribut pour faciliter l'affichage
+                    donnees_discipline.append(eleve)
+                except (ValueError, TypeError):
+                    print(f"Valeur non convertible pour {eleve.nom}: {eleve.disciplines[moy_key]}")
         
         # Filtrer par sexe si spécifié
-        if sexe:
-            donnees_discipline = [
-                eleve for eleve in donnees_discipline
-                if 'Sexe' in eleve.disciplines and eleve.disciplines.get('Sexe', '').upper().startswith(sexe.upper())
-            ]
+        if sexe and donnees_discipline:
+            donnees_discipline_filtrees = []
+            for eleve in donnees_discipline:
+                sexe_eleve = None
+                # Chercher le sexe dans les disciplines (peut être stocké sous différentes clés)
+                for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                    if key in eleve.disciplines:
+                        sexe_eleve = eleve.disciplines[key]
+                        break
+                
+                if sexe_eleve:
+                    if sexe == 'M' and sexe_eleve.upper().startswith(('M', 'H')):
+                        donnees_discipline_filtrees.append(eleve)
+                    elif sexe == 'F' and sexe_eleve.upper().startswith('F'):
+                        donnees_discipline_filtrees.append(eleve)
+            
+            donnees_discipline = donnees_discipline_filtrees
         
         # Calculer les statistiques
         if donnees_discipline:
             import statistics
             
             # Extraire les moyennes
-            moyennes = []
-            for eleve in donnees_discipline:
-                try:
-                    moyenne = float(eleve.disciplines.get(moy_key, 0))
-                    moyennes.append(moyenne)
-                except (ValueError, TypeError):
-                    pass
+            moyennes = [eleve.moyenne_discipline for eleve in donnees_discipline]
             
             if moyennes:
                 stats_discipline = {
@@ -1007,6 +1139,7 @@ def semestre1_analyse_disciplines(request):
                     'min_moyenne': round(min(moyennes), 2),
                     'max_moyenne': round(max(moyennes), 2),
                     'ecart_type': round(statistics.pstdev(moyennes) if len(moyennes) > 1 else 0, 2),
+                    'mediane': round(statistics.median(moyennes), 2) if len(moyennes) > 0 else 0,
                 }
                 
                 # Calculer la distribution des notes
@@ -1025,6 +1158,31 @@ def semestre1_analyse_disciplines(request):
                         distribution_notes['data'][5] += 1
                     else:
                         distribution_notes['data'][6] += 1
+                
+                # Calculer pourcentage de réussite (>= 10)
+                reussite_count = sum(1 for m in moyennes if m >= 10)
+                stats_discipline['taux_reussite'] = round(reussite_count / len(moyennes) * 100, 1)
+                
+                # Répartition par sexe
+                if sexe_counts := {'M': 0, 'F': 0, 'Non précisé': 0}:
+                    for eleve in donnees_discipline:
+                        sexe_trouve = False
+                        for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                            if key in eleve.disciplines:
+                                valeur = str(eleve.disciplines[key]).upper()
+                                if valeur.startswith(('M', 'H')):
+                                    sexe_counts['M'] += 1
+                                    sexe_trouve = True
+                                    break
+                                elif valeur.startswith('F'):
+                                    sexe_counts['F'] += 1
+                                    sexe_trouve = True
+                                    break
+                        
+                        if not sexe_trouve:
+                            sexe_counts['Non précisé'] += 1
+                    
+                    stats_discipline['repartition_sexe'] = sexe_counts
             else:
                 stats_discipline = {
                     'nombre_eleves': 0,
@@ -1032,7 +1190,18 @@ def semestre1_analyse_disciplines(request):
                     'min_moyenne': 0,
                     'max_moyenne': 0,
                     'ecart_type': 0,
+                    'mediane': 0,
+                    'taux_reussite': 0,
+                    'repartition_sexe': {'M': 0, 'F': 0, 'Non précisé': 0}
                 }
+    
+    # Trier les données par moyenne décroissante
+    if donnees_discipline:
+        donnees_discipline.sort(key=lambda x: x.moyenne_discipline, reverse=True)
+        
+        # Ajouter le rang à chaque élève
+        for i, eleve in enumerate(donnees_discipline):
+            eleve.rang = i + 1
     
     context = {
         'etablissement': etablissement,
@@ -1048,6 +1217,7 @@ def semestre1_analyse_disciplines(request):
         'stats_discipline': stats_discipline,
         'donnees_discipline': donnees_discipline,
         'distribution_notes': distribution_notes,
+        'debug_mode': True,  # Pour afficher des informations de débogage dans le template
     }
     
     return render(request, 'core/semestre1/analyse_disciplines.html', context)
