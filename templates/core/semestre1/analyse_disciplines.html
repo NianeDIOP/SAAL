@@ -43,6 +43,18 @@
 {% endblock %}
 
 {% block semestre1_content %}
+<!-- Débogage des disciplines disponibles -->
+<div class="alert alert-info mb-3">
+    <strong>Disciplines disponibles ({{ disciplines_disponibles|length }}) :</strong>
+    <ul>
+        {% for discipline in disciplines_disponibles %}
+        <li>{{ discipline }}</li>
+        {% empty %}
+        <li>Aucune discipline trouvée</li>
+        {% endfor %}
+    </ul>
+</div>
+
 <!-- Filtres -->
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white">
@@ -213,7 +225,9 @@
                                     <td>{{ eleve.prenom|default:'-' }}</td>
                                     <td>{{ eleve.classe|default:'-' }}</td>
                                     <td class="text-end fw-bold">
-                                        {{ eleve.disciplines|get_item:selected_discipline|add:" Moy D"|get_item:eleve.disciplines|floatformat:2 }}
+                                        {% with discipline_key=selected_discipline|add:" Moy D" %}
+                                            {{ eleve.disciplines|get_item:discipline_key|default:"0.00"|floatformat:2 }}
+                                        {% endwith %}
                                     </td>
                                     <td>
                                         {% for key, value in eleve.disciplines.items %}
@@ -341,7 +355,8 @@ function exportTableToCSV() {
     downloadLink.href = window.URL.createObjectURL(csvFile);
     downloadLink.style.display = 'none';
     
-    document.body.appendChild(downloadLink.click();
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
     document.body.removeChild(downloadLink);
 }
 
