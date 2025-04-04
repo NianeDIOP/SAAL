@@ -403,12 +403,12 @@
                                     Classe non spécifiée
                                 {% endif %}
                                 | 
-                                {% if eleve.sexe == 'M' %}
-                                    <i class="fas fa-male text-primary"></i> Masculin
+                                {% if eleve.sexe == 'M' or eleve.sexe == 'H' %}
+                                    <i class="fas fa-male text-primary me-1"></i>Masculin
                                 {% elif eleve.sexe == 'F' %}
-                                    <i class="fas fa-female text-danger"></i> Féminin
+                                    <i class="fas fa-female text-danger me-1"></i>Féminin
                                 {% else %}
-                                    Sexe non précisé
+                                    Non précisé
                                 {% endif %}
                             </div>
                         </div>
@@ -492,7 +492,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if eleve.sexe == 'M' %}
+                                        {% if eleve.sexe == 'M' or eleve.sexe == 'H' %}
                                             <i class="fas fa-male text-primary me-1"></i>Masculin
                                         {% elif eleve.sexe == 'F' %}
                                             <i class="fas fa-female text-danger me-1"></i>Féminin

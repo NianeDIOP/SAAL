@@ -113,6 +113,21 @@
         font-size: 0.8rem;
         font-weight: 500;
     }
+
+    #filtre-actions {
+        display: flex;
+        height: 100%;
+    }
+    
+    #filtre-actions button {
+        flex: 1;
+        height: 31px; /* Hauteur fixe correspondant aux champs select-sm */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
 </style>
 {% endblock %}
 
@@ -180,10 +195,11 @@
             <div class="col-md-2">
                 <label for="filtre-actions" class="form-label small">&nbsp;</label>
                 <div class="d-flex gap-2" id="filtre-actions">
-                    <button type="submit" class="btn btn-sm btn-primary flex-fill h-100" style="height: 40px !important;">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill">
                         <i class="fas fa-search me-1"></i>Filtrer
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill h-100" style="height: 40px !important;" onclick="resetFilters()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetFilters()">
+                        <i class="fas fa-sync me-1"></i>Réinitialiser
                     </button>
                 </div>
             </div>
