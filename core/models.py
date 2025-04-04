@@ -153,6 +153,8 @@ class DonneesDetailleesEleves(models.Model):
     nom = models.CharField(max_length=100)
     prenom = models.CharField(max_length=100, blank=True, null=True)
     classe = models.CharField(max_length=50, blank=True, null=True)
+    # Nouveau champ pour stocker le sexe
+    sexe = models.CharField(max_length=1, blank=True, null=True)
     # Pour les colonnes de disciplines qui sont variables, nous utiliserons un champ JSON
     disciplines = models.JSONField(default=dict, blank=True)
     
@@ -197,7 +199,7 @@ class DonneesDetailleesEleves(models.Model):
         disciplines = set(
             discipline.replace(' Moy D', '') 
             for discipline in toutes_disciplines 
-            if not discipline.endswith('Moy D')
+            if discipline.endswith('Moy D')
         )
         
         return sorted(list(disciplines))

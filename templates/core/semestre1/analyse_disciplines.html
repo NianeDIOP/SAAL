@@ -492,9 +492,9 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if eleve.sexe == 'M' or eleve.sexe == 'H' %}
+                                        {% if eleve.sexe_value == 'M' %}
                                             <i class="fas fa-male text-primary me-1"></i>Masculin
-                                        {% elif eleve.sexe == 'F' %}
+                                        {% elif eleve.sexe_value == 'F' %}
                                             <i class="fas fa-female text-danger me-1"></i>Féminin
                                         {% else %}
                                             <i class="fas fa-question-circle me-1"></i>Non précisé
