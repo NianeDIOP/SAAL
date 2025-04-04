@@ -1509,3 +1509,5 @@ def semestre1_analyse_disciplines(request):
     }
     
     return render(request, 'core/semestre1/analyse_disciplines.html', context)
+
+    
