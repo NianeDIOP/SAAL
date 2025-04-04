@@ -87,6 +87,21 @@
         border-radius: 30px;
         padding: 0.35em 0.8em;
     }
+    
+    #filtre-actions {
+        display: flex;
+        height: 100%;
+    }
+    
+    #filtre-actions button {
+        flex: 1;
+        height: 31px; /* Hauteur fixe correspondant aux champs select-sm */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
 </style>
 {% endblock extra_css %}
 
@@ -170,11 +185,12 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <label for="filtre-actions" class="form-label small">&nbsp;</label>
                 <div class="d-flex gap-2" id="filtre-actions">
-                    <button type="submit" class="btn btn-sm btn-primary flex-fill h-100">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill">
                         <i class="fas fa-search me-1"></i>Filtrer
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill h-100" onclick="resetFilters()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetFilters()">
                         <i class="fas fa-sync me-1"></i>Réinitialiser
                     </button>
                 </div>
@@ -212,9 +228,9 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="small text-muted">
                                             <i class="fas fa-male text-primary"></i> {{ stats_discipline.repartition_sexe.M }} 
-                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.M|div:stats_discipline.nombre_eleves|floatformat:1 }}{% else %}0{% endif %}%)
+                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.M|div:stats_discipline.nombre_eleves|mul:100|floatformat:1 }}{% else %}0{% endif %}%)
                                             <i class="fas fa-female text-danger ms-2"></i> {{ stats_discipline.repartition_sexe.F }}
-                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.F|div:stats_discipline.nombre_eleves|floatformat:1 }}{% else %}0{% endif %}%)
+                                            ({% if stats_discipline.nombre_eleves > 0 %}{{ stats_discipline.repartition_sexe.F|div:stats_discipline.nombre_eleves|mul:100|floatformat:1 }}{% else %}0{% endif %}%)
                                         </span>
                                     </div>
                                 </div>
@@ -446,24 +462,15 @@
                                     <td>
                                         {% if eleve.prenom %}
                                             {{ eleve.prenom }}
-                                        {% elif eleve.disciplines %}
-                                            {% with prenom=None %}
-                                                {% for key in 'Prénom,prenom,PRENOM'|split:',' %}
-                                                    {% if key in eleve.disciplines and eleve.disciplines|get_item:key %}
-                                                        {% with prenom=eleve.disciplines|get_item:key %}
-                                                            {{ prenom }}
-                                                        {% endwith %}
-                                                        {% comment %}Exit the loop effectively{% endcomment %}
-                                                        {% if prenom %}{% endif %}
+                                        {% else %}
+                                            {% with prenom_found=False %}
+                                                {% for key in 'Prénom,prenom,PRENOM,Prenom'|split:',' %}
+                                                    {% if not prenom_found and key in eleve.disciplines and eleve.disciplines|get_item:key %}
+                                                        {{ eleve.disciplines|get_item:key }}
+                                                        {% with prenom_found=True %}{% endwith %}
                                                     {% endif %}
                                                 {% endfor %}
-                                                
-                                                {% if not prenom %}
-                                                    -
-                                                {% endif %}
                                             {% endwith %}
-                                        {% else %}
-                                            -
                                         {% endif %}
                                     </td>
                                     <td>
@@ -478,6 +485,8 @@
                                     <td>
                                         {% if eleve.classe_obj and eleve.classe_obj.niveau %}
                                             {{ eleve.classe_obj.niveau.nom }}
+                                        {% elif eleve.niveau_obj %}
+                                            {{ eleve.niveau_obj.nom }}
                                         {% else %}
                                             -
                                         {% endif %}
@@ -497,15 +506,14 @@
                                         </span>
                                     </td>
                                     <td>
-                                        {% if 'Appréciation' in eleve.disciplines %}
-                                            {{ eleve.disciplines.Appréciation }}
-                                        {% elif 'Appreciation' in eleve.disciplines %}
-                                            {{ eleve.disciplines.Appreciation }}
-                                        {% elif 'appreciation' in eleve.disciplines %}
-                                            {{ eleve.disciplines.appreciation }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                        {% with appreciation_found=False %}
+                                            {% for key in 'Appréciation,Appreciation,appreciation'|split:',' %}
+                                                {% if not appreciation_found and key in eleve.disciplines %}
+                                                    {{ eleve.disciplines|get_item:key }}
+                                                    {% with appreciation_found=True %}{% endwith %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endwith %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -543,7 +551,7 @@ $(document).ready(function() {
             url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
         },
         responsive: true,
-        order: [[5, 'desc']], // Trier par note décroissante (colonne 5)
+        order: [[6, 'desc']], // Trier par note décroissante (colonne 6)
         pageLength: 25,
         dom: '<"d-flex justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex"f>>t<"d-flex justify-content-between align-items-center"<"d-flex"i><"d-flex"p>>',
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]]
@@ -640,7 +648,7 @@ function exportTableToCSV() {
     csv.push('"Statistiques:"');
     csv.push('"Nombre d\'élèves: {{ stats_discipline.nombre_eleves }}"');
     csv.push('"Moyenne générale: {{ stats_discipline.moyenne_globale|floatformat:2 }}"');
-    csv.push('"Taux de réussite: {{ stats_discipline.taux_reussite|floatformat:1 }}%"');
+    csv.push('"Taux de réussite: {{ stats_discipline.taux_reussite.total|floatformat:1 }}%"');
     csv.push('""');
     
     // En-têtes du tableau
@@ -731,7 +739,7 @@ function printTable() {
                             <div class="stat-label">Moyenne</div>
                         </div>
                         <div class="stat-item">
-                            <div class="stat-value">{{ stats_discipline.taux_reussite|floatformat:1 }}%</div>
+                            <div class="stat-value">{{ stats_discipline.taux_reussite.total|floatformat:1 }}%</div>
                             <div class="stat-label">Taux de réussite</div>
                         </div>
                         <div class="stat-item">
@@ -758,6 +766,17 @@ function printTable() {
 
 // Script supplémentaire pour adapter l'interface utilisateur
 document.addEventListener('DOMContentLoaded', function() {
+    // Égaliser la hauteur des boutons de filtre avec les champs de sélection
+    const filterButtons = document.querySelectorAll('#filtre-actions button');
+    const selectElements = document.querySelectorAll('select.form-select-sm');
+    
+    if (selectElements.length > 0 && filterButtons.length > 0) {
+        const selectHeight = selectElements[0].offsetHeight;
+        filterButtons.forEach(button => {
+            button.style.height = selectHeight + 'px';
+        });
+    }
+    
     // Automatiquement sélectionner la première discipline disponible si aucune n'est sélectionnée
     const disciplineSelect = document.getElementById('discipline');
     const importSelect = document.getElementById('import');

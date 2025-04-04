@@ -399,10 +399,33 @@ def semestre1_importation(request):
             # --- 8) Stocker les données du tableau "Données détaillées"
             # Extraire les noms des disciplines correctement
             discipline_colonnes = noms_moy_d
-            
+
             # Créer un dictionnaire pour associer élèves et données détaillées
             donnees_detail_par_eleve = {}
-            
+
+            # Créer un dictionnaire pour stocker les sexes par élève depuis l'onglet "Moyennes eleves"
+            sexes_par_eleve = {}
+            for _, row in df_moyennes.iterrows():
+                nom = str(row.get('Nom', ''))
+                prenom = str(row.get('Prénom', '')) if pd.notna(row.get('Prénom')) else None
+                
+                # Récupérer le sexe s'il existe dans les données
+                sexe = None
+                for col in ['Sexe', 'sexe', 'Genre', 'genre']:
+                    if col in df_moyennes.columns and pd.notna(row.get(col)):
+                        sexe_valeur = str(row.get(col)).upper()
+                        if sexe_valeur.startswith('M') or sexe_valeur.startswith('H'):
+                            sexe = 'M'
+                            break
+                        elif sexe_valeur.startswith('F'):
+                            sexe = 'F'
+                            break
+                
+                if nom:
+                    # Utiliser (nom, prenom) comme clé
+                    sexes_par_eleve[(nom, prenom)] = sexe
+
+            # Maintenant, traitons les données détaillées
             for _, row in df_final.iterrows():
                 nom = str(row.get('Nom', ''))
                 prenom = str(row.get('Prénom', '')) if pd.notna(row.get('Prénom')) else None
@@ -427,6 +450,12 @@ def semestre1_importation(request):
                 for col in info_colonnes.columns:
                     if pd.notna(row.get(col)):
                         disciplines_dict[col] = row.get(col)
+                
+                # Ajouter le sexe au dictionnaire des disciplines (depuis les données de moyennes)
+                sexe = sexes_par_eleve.get((nom, prenom))
+                if sexe:
+                    # Stocker le sexe de manière standardisée
+                    disciplines_dict['Sexe'] = sexe
                 
                 # Sauvegarder dans la base de données
                 if nom:  # S'assurer qu'il y a un nom
@@ -1175,100 +1204,102 @@ def semestre1_analyse_disciplines(request):
         # Construire la clé de moyenne pour la discipline
         moy_key = f"{discipline_selectionnee} Moy D"
         
-        # Chercher les données de moyennes générales pour enrichir les informations
+        # Récupérer TOUTES les données de moyennes pour le(s) import(s) sélectionné(s)
+        # Cette étape est cruciale pour assurer la cohérence des données de sexe
         moyennes_query = DonneesMoyennesEleves.objects.filter(
             import_fichier__semestre=1,
             import_fichier__annee_scolaire=annee_scolaire,
             import_fichier__statut='termine'
         )
+        
         if import_id:
             moyennes_query = moyennes_query.filter(import_fichier_id=import_id)
         
-        # Filtrer les données (avec vérification plus explicite)
-        donnees_discipline = []
+        # Créer un dictionnaire pour accéder rapidement aux données de moyennes par élève
+        moyennes_dict = {}
+        for m in moyennes_query:
+            # Clé standardisée pour identifier un élève
+            eleve_key = (m.nom.strip().lower(), (m.prenom or '').strip().lower())
+            moyennes_dict[eleve_key] = m
+        
+        # Filtrer les données pour la discipline sélectionnée
         for eleve in donnees_query:
             if moy_key in eleve.disciplines and eleve.disciplines[moy_key] is not None:
-                # Vérifiez si la valeur peut être convertie en float
                 try:
-                    moyenne = float(eleve.disciplines[moy_key])
+                    # Extraire la moyenne pour cette discipline
+                    moyenne = float(str(eleve.disciplines[moy_key]).replace(',', '.'))
                     eleve.moyenne_discipline = moyenne
                     
+                    # Construire la clé pour retrouver cet élève dans les données de moyennes
+                    eleve_key = (eleve.nom.strip().lower(), (eleve.prenom or '').strip().lower())
                     
-
-                    # Chercher les informations supplémentaires dans les moyennes générales
-                    infos_supplementaires = moyennes_query.filter(
-                        nom=eleve.nom, 
-                        prenom=eleve.prenom if eleve.prenom else None
-                    ).first()
+                    # Récupérer l'entrée correspondante dans les moyennes
+                    moyennes_eleve = moyennes_dict.get(eleve_key)
                     
-                    # Extraction du sexe
-                    sexe_eleve = None
-                    sexe_keys = ['Sexe', 'sexe', 'Genre', 'genre']
+                    # Assigner des valeurs par défaut
+                    eleve.sexe = 'Non précisé'
+                    eleve.classe_obj = None
+                    eleve.niveau_obj = None
                     
-                    # Chercher dans les données détaillées
-                    for key in sexe_keys:
-                        if key in eleve.disciplines:
-                            sexe_eleve = str(eleve.disciplines[key]).upper()
-                            break
+                    # Si on a trouvé l'élève dans les moyennes, récupérer ses informations
+                    if moyennes_eleve:
+                        # Récupérer le sexe depuis les données additionnelles
+                        if moyennes_eleve.donnees_additionnelles:
+                            for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                                if key in moyennes_eleve.donnees_additionnelles:
+                                    sexe_valeur = str(moyennes_eleve.donnees_additionnelles[key]).upper()
+                                    if sexe_valeur.startswith('M') or sexe_valeur.startswith('H'):
+                                        eleve.sexe = 'M'
+                                        break
+                                    elif sexe_valeur.startswith('F'):
+                                        eleve.sexe = 'F'
+                                        break
+                        
+                        # Récupérer les informations de classe et niveau
+                        eleve.classe_obj = moyennes_eleve.classe_obj
+                        eleve.niveau_obj = moyennes_eleve.niveau
+                        
+                        # Récupérer le prénom si manquant
+                        if not eleve.prenom and moyennes_eleve.prenom:
+                            eleve.prenom = moyennes_eleve.prenom
                     
-                    # Si non trouvé, chercher dans les données de moyennes
-                    if not sexe_eleve and infos_supplementaires and infos_supplementaires.donnees_additionnelles:
-                        for key in sexe_keys:
-                            if key in infos_supplementaires.donnees_additionnelles:
-                                sexe_eleve = str(infos_supplementaires.donnees_additionnelles[key]).upper()
-                                break
-                    
-                    # Formater le sexe
-                    if sexe_eleve:
-                        if any(sexe_eleve.startswith(prefix) for prefix in ['M', 'H']):
-                            eleve.sexe = 'M'
-                        elif sexe_eleve.startswith('F'):
-                            eleve.sexe = 'F'
-                        else:
-                            eleve.sexe = 'Non précisé'
-                    else:
-                        eleve.sexe = 'Non précisé'
-                    
-                    # Enrichir avec des informations de classe et de niveau
-                    if infos_supplementaires:
-                        eleve.classe_obj = infos_supplementaires.classe_obj
-                        eleve.niveau_obj = infos_supplementaires.niveau
-                        eleve.prenom = infos_supplementaires.prenom or eleve.prenom
-                    else:
-                        # Essayer de trouver la classe par correspondance
-                        eleve.classe_obj = None
-                        eleve.niveau_obj = None
-                        if eleve.classe:
-                            for c in classes:
-                                if c.nom in eleve.classe:
-                                    eleve.classe_obj = c
-                                    eleve.niveau_obj = c.niveau
+                    # Si le sexe est introuvable dans les moyennes, essayer dans les disciplines
+                    # (uniquement si le sexe n'a pas été trouvé dans les moyennes)
+                    if eleve.sexe == 'Non précisé':
+                        for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                            if key in eleve.disciplines:
+                                sexe_valeur = str(eleve.disciplines[key]).upper()
+                                if sexe_valeur.startswith('M') or sexe_valeur.startswith('H'):
+                                    eleve.sexe = 'M'
                                     break
-
-                    # Ajout de stratégies supplémentaires pour récupérer le prénom
-                    if not eleve.prenom:
-                        # Chercher dans les disciplines
-                        prenom_keys = ['Prénom', 'prenom', 'PRENOM']
-                        for key in prenom_keys:
-                            if key in eleve.disciplines and eleve.disciplines[key]:
-                                eleve.prenom = str(eleve.disciplines[key])
+                                elif sexe_valeur.startswith('F'):
+                                    eleve.sexe = 'F'
+                                    break
+                    
+                    # Assigner d'autres informations manquantes si nécessaire
+                    if not eleve.classe_obj and eleve.classe:
+                        for c in classes:
+                            if c.nom in eleve.classe:
+                                eleve.classe_obj = c
+                                eleve.niveau_obj = c.niveau
                                 break
                     
-                    # Filtrage par sexe si spécifié
+                    # Appliquer le filtre par sexe
                     if not sexe or eleve.sexe == sexe:
                         donnees_discipline.append(eleve)
                 
-                except (ValueError, TypeError):
-                    print(f"Valeur non convertible pour {eleve.nom}: {eleve.disciplines[moy_key]}")
+                except (ValueError, TypeError) as e:
+                    print(f"Erreur pour {eleve.nom}: {e} - Valeur: {eleve.disciplines.get(moy_key, 'Non trouvée')}")
         
-        # Calculer les statistiques
+        # Calculer toutes les statistiques
         if donnees_discipline:
             import statistics
             
-            # Extraire les moyennes
+            # Récupérer les moyennes de tous les élèves
             moyennes = [eleve.moyenne_discipline for eleve in donnees_discipline]
             
             if moyennes:
+                # Statistiques de base
                 stats_discipline = {
                     'nombre_eleves': len(moyennes),
                     'moyenne_globale': round(sum(moyennes) / len(moyennes), 2),
@@ -1278,7 +1309,7 @@ def semestre1_analyse_disciplines(request):
                     'mediane': round(statistics.median(moyennes), 2) if len(moyennes) > 0 else 0,
                 }
                 
-                # Calculer la distribution des notes
+                # Distribution des notes
                 for moyenne in moyennes:
                     if moyenne < 4:
                         distribution_notes['data'][0] += 1
@@ -1295,48 +1326,41 @@ def semestre1_analyse_disciplines(request):
                     else:
                         distribution_notes['data'][6] += 1
                 
-                # Calculer taux de réussite global et par sexe
-                total_eleves = len(moyennes)
-                reussite_global = sum(1 for m in moyennes if m >= 10)
+                # Répartition par sexe (EXACTEMENT comme dans analyse_moyennes)
+                repartition_sexe = {'M': 0, 'F': 0, 'Non précisé': 0}
+                reussite_par_sexe = {'M': 0, 'F': 0}
+                
+                for eleve in donnees_discipline:
+                    # Compter l'élève dans la répartition par sexe
+                    repartition_sexe[eleve.sexe] += 1
+                    
+                    # Si l'élève a une moyenne ≥ 10, le compter dans les réussites
+                    if eleve.moyenne_discipline >= 10:
+                        if eleve.sexe in ['M', 'F']:
+                            reussite_par_sexe[eleve.sexe] += 1
+                
+                # Calculer les taux de réussite
+                total_eleves = len(donnees_discipline)
+                reussite_totale = sum(1 for m in moyennes if m >= 10)
+                
+                stats_discipline['repartition_sexe'] = repartition_sexe
                 stats_discipline['taux_reussite'] = {
-                    'total': round(reussite_global / total_eleves * 100, 1),
-                    'par_sexe': {
-                        'M': 0,
-                        'F': 0
-                    }
+                    'total': round(reussite_totale / total_eleves * 100, 1) if total_eleves > 0 else 0,
+                    'nombre': reussite_totale,
+                    'par_sexe': reussite_par_sexe
                 }
                 
-                # Calculer le taux de réussite par sexe
-                for eleve in donnees_discipline:
-                    if eleve.moyenne_discipline >= 10:
-                        if eleve.sexe == 'M':
-                            stats_discipline['taux_reussite']['par_sexe']['M'] += 1
-                        elif eleve.sexe == 'F':
-                            stats_discipline['taux_reussite']['par_sexe']['F'] += 1
-                
                 # Calculer les pourcentages de réussite par sexe
-                sexe_totaux = {'M': 0, 'F': 0}
-                for eleve in donnees_discipline:
-                    if eleve.sexe in ['M', 'F']:
-                        sexe_totaux[eleve.sexe] += 1
-                
-                # Calcul des pourcentages de réussite par sexe
                 for sexe_key in ['M', 'F']:
-                    total_sexe = sexe_totaux.get(sexe_key, 0)
+                    total_sexe = repartition_sexe.get(sexe_key, 0)
                     if total_sexe > 0:
                         stats_discipline['taux_reussite']['par_sexe'][f'{sexe_key}_taux'] = round(
-                            stats_discipline['taux_reussite']['par_sexe'][sexe_key] / total_sexe * 100, 1
+                            reussite_par_sexe[sexe_key] / total_sexe * 100, 1
                         )
                     else:
                         stats_discipline['taux_reussite']['par_sexe'][f'{sexe_key}_taux'] = 0
-                
-                # Répartition par sexe
-                sexe_counts = {'M': 0, 'F': 0, 'Non précisé': 0}
-                for eleve in donnees_discipline:
-                    sexe_counts[eleve.sexe] += 1
-                
-                stats_discipline['repartition_sexe'] = sexe_counts
             else:
+                # Valeurs par défaut si pas de données
                 stats_discipline = {
                     'nombre_eleves': 0,
                     'moyenne_globale': 0,
@@ -1346,6 +1370,7 @@ def semestre1_analyse_disciplines(request):
                     'mediane': 0,
                     'taux_reussite': {
                         'total': 0,
+                        'nombre': 0,
                         'par_sexe': {
                             'M': 0,
                             'F': 0,
