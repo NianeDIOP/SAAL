@@ -312,30 +312,26 @@ def semestre1_importation(request):
             df_final = pd.concat([info_colonnes, df_detail_moy_d], axis=1)
             
             # --- 7) Ajouter la colonne de sexe à df_final ---
-            df_final['Sexe'] = None
-            
-            # Pour chaque élève dans df_final, récupérer son sexe depuis eleves_avec_sexe
-            for idx, row in df_final.iterrows():
-                nom = str(row.get('Nom', '')).strip()
-                prenom = str(row.get('Prénom', '')).strip() if pd.notna(row.get('Prénom')) else ''
-                ine = str(row.get('INE', '')).strip() if 'INE' in row and pd.notna(row.get('INE')) else None
+            # --- 7) Ajouter la colonne de sexe à df_final ---
+            # Vérifier si la colonne Sexe existe dans df_moyennes
+            if 'Sexe' in df_moyennes.columns:
+                # Créer un dictionnaire pour associer nom+prénom à la valeur de sexe
+                sexe_map = {}
+                for idx, row in df_moyennes.iterrows():
+                    nom = str(row.get('Nom', '')).strip()
+                    prenom = str(row.get('Prénom', '')).strip() if pd.notna(row.get('Prénom')) else ''
+                    if pd.notna(row.get('Sexe')):
+                        sexe_map[(nom.lower(), prenom.lower())] = row.get('Sexe')
                 
-                sexe = None
-                
-                # D'abord chercher par INE
-                if ine and ine in eleves_avec_sexe:
-                    sexe = eleves_avec_sexe[ine]
-                    print(f"Sexe trouvé par INE pour {nom} {prenom}: {sexe}")
-                # Ensuite chercher par nom/prénom
-                else:
-                    eleve_key = (nom.lower(), prenom.lower())
-                    if eleve_key in eleves_avec_sexe:
-                        sexe = eleves_avec_sexe[eleve_key]
-                        print(f"Sexe trouvé par nom/prénom pour {nom} {prenom}: {sexe}")
-                
-                # Assigner le sexe standardisé
-                if sexe:
-                    df_final.loc[idx, 'Sexe'] = sexe
+                # Appliquer à df_final
+                df_final['Sexe'] = None
+                for idx, row in df_final.iterrows():
+                    nom = str(row.get('Nom', '')).strip()
+                    prenom = str(row.get('Prénom', '')).strip() if pd.notna(row.get('Prénom')) else ''
+                    key = (nom.lower(), prenom.lower())
+                    if key in sexe_map:
+                        df_final.loc[idx, 'Sexe'] = sexe_map[key]
+                        print(f"Sexe ajouté pour {nom} {prenom}: {sexe_map[key]}")
             
             # --- 8) Stocker les données du tableau "Moyennes eleves"
             print("DEBUG - TRAITEMENT DES MOYENNES PAR ÉLÈVE:")
@@ -451,6 +447,8 @@ def semestre1_importation(request):
                         print(f"MoyenneEleve créé: ID={moyenne_eleve.id}, Moyenne={moyenne_eleve.moyenne_generale}")
             
             # --- 9) Stocker les données du tableau "Données détaillées"
+            # Créer un dictionnaire pour stocker les données détaillées
+
             # Extraire les noms des disciplines correctement
             discipline_colonnes = noms_moy_d
 
@@ -481,7 +479,7 @@ def semestre1_importation(request):
                     print(f"Sexe stocké pour {nom} {prenom}: {sexe}")
 
             # Maintenant, traitons les données détaillées
-            for _, row in df_final.iterrows():
+            for idx, row in df_final.iterrows():
                 nom = str(row.get('Nom', ''))
                 prenom = str(row.get('Prénom', '')) if pd.notna(row.get('Prénom')) else None
                 classe_nom = str(row.get('Classe', '')) if pd.notna(row.get('Classe')) else None
@@ -506,13 +504,17 @@ def semestre1_importation(request):
                     if pd.notna(row.get(col)):
                         disciplines_dict[col] = row.get(col)
                 
-                # Ajouter le sexe au dictionnaire (directement depuis df_final qui a été enrichi)
-                if pd.notna(row.get('Sexe')):
-                    disciplines_dict['Sexe'] = row.get('Sexe')
+                # Récupérer le sexe directement depuis df_final
+                sexe_value = row.get('Sexe')
                 
-                # Récupérer le sexe depuis le dictionnaire sexe_par_eleve
-                eleve_key = (nom.lower(), (prenom or '').lower())
-                sexe = sexe_par_eleve.get(eleve_key)
+                # Si pas trouvé, essayer depuis sexe_par_eleve
+                if not sexe_value:
+                    eleve_key = (nom.lower(), (prenom or '').lower())
+                    sexe_value = sexe_par_eleve.get(eleve_key)
+                
+                # Ajouter le sexe au dictionnaire disciplines
+                if sexe_value:
+                    disciplines_dict['Sexe'] = sexe_value
                 
                 # Sauvegarder dans la base de données
                 if nom:  # S'assurer qu'il y a un nom
@@ -521,7 +523,7 @@ def semestre1_importation(request):
                         nom=nom,
                         prenom=prenom,
                         classe=classe_nom,
-                        sexe=sexe,  # Ajouter le sexe ici
+                        sexe=sexe_value,  # Ajouter le sexe ici
                         disciplines=disciplines_dict
                     )
                     
@@ -588,7 +590,6 @@ def semestre1_importation(request):
     }
     
     return render(request, 'core/semestre1/importation.html', context)
-
 def semestre1_importation_detail(request, import_id):
     """
     Vue pour afficher les détails d'une importation spécifique
@@ -1312,9 +1313,29 @@ def semestre1_analyse_disciplines(request):
                     moyenne = float(str(eleve.disciplines[moy_key]).replace(',', '.'))
                     eleve.moyenne_discipline = moyenne
 
-                    # Récupérer le sexe depuis le dictionnaire sexe_correct
-                    eleve_key = (eleve.nom.strip().lower(), (eleve.prenom or '').strip().lower())
-                    eleve.sexe_value = sexe_correct.get(eleve_key, 'Non précisé')
+                    # Déterminer le sexe de l'élève - méthode prioritaire
+                    eleve.sexe_value = 'Non précisé'
+                    
+                    # 1. D'abord vérifier le champ sexe du modèle
+                    if eleve.sexe:
+                        if eleve.sexe.upper() in ['M', 'H']:
+                            eleve.sexe_value = 'M'
+                        elif eleve.sexe.upper() == 'F':
+                            eleve.sexe_value = 'F'
+                    
+                    # 2. Ensuite vérifier dans disciplines
+                    elif 'Sexe' in eleve.disciplines and eleve.disciplines['Sexe']:
+                        sexe_val = str(eleve.disciplines['Sexe']).upper()
+                        if sexe_val.startswith('M') or sexe_val.startswith('H'):
+                            eleve.sexe_value = 'M'
+                        elif sexe_val.startswith('F'):
+                            eleve.sexe_value = 'F'
+                    
+                    # 3. Enfin chercher par clé nom/prénom
+                    else:
+                        eleve_key = (eleve.nom.strip().lower(), (eleve.prenom or '').strip().lower())
+                        if eleve_key in sexe_correct:
+                            eleve.sexe_value = sexe_correct[eleve_key]
                     
                     # Récupérer l'INE de l'élève depuis disciplines
                     ine_eleve = None
@@ -1403,12 +1424,12 @@ def semestre1_analyse_disciplines(request):
                     else:
                         distribution_notes['data'][6] += 1
                 
-                # Répartition par sexe (EXACTEMENT comme dans analyse_moyennes)
+                # Répartition par sexe
                 repartition_sexe = {'M': 0, 'F': 0, 'Non précisé': 0}
                 reussite_par_sexe = {'M': 0, 'F': 0}
 
                 for eleve in donnees_discipline:
-                    # Utiliser sexe_value au lieu de sexe
+                    # Utiliser sexe_value qui a été correctement défini
                     sexe_standardise = eleve.sexe_value
                     if sexe_standardise not in ['M', 'F']:
                         sexe_standardise = 'Non précisé'
