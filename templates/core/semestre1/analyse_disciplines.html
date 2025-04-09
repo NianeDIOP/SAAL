@@ -492,12 +492,12 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if eleve.sexe_value == 'M' %}
+                                        {% if eleve.get_sexe_normalise == 'M' %}
                                             <i class="fas fa-male text-primary me-1"></i>Masculin
-                                        {% elif eleve.sexe_value == 'F' %}
+                                        {% elif eleve.get_sexe_normalise == 'F' %}
                                             <i class="fas fa-female text-danger me-1"></i>Féminin
                                         {% else %}
-                                            <i class="fas fa-question-circle me-1"></i>Non précisé
+                                            <i class="fas fa-question-circle text-secondary me-1"></i>Non précisé
                                         {% endif %}
                                     </td>
                                     <td class="text-center">

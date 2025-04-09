@@ -203,3 +203,26 @@ class DonneesDetailleesEleves(models.Model):
         )
         
         return sorted(list(disciplines))
+    def get_sexe_normalise(self):
+        """
+        Retourne le sexe normalisé (M ou F) de l'élève
+        """
+        # D'abord vérifier le champ sexe du modèle
+        if self.sexe:
+            sexe_val = str(self.sexe).upper()
+            if sexe_val in ['M', 'H']:
+                return 'M'
+            elif sexe_val == 'F':
+                return 'F'
+        
+        # Ensuite vérifier dans le JSON des disciplines
+        if self.disciplines:
+            for key in ['Sexe', 'sexe', 'Genre', 'genre']:
+                if key in self.disciplines and self.disciplines[key]:
+                    sexe_val = str(self.disciplines[key]).upper()
+                    if sexe_val.startswith('M') or sexe_val.startswith('H'):
+                        return 'M'
+                    elif sexe_val.startswith('F'):
+                        return 'F'
+        
+        return None
