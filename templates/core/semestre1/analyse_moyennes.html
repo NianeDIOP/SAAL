@@ -207,6 +207,14 @@
     </div>
 </div>
 
+<!-- Ajoutez ce code juste après le div des filtres dans templates/core/semestre1/analyse_moyennes.html -->
+
+<div class="mb-3 d-flex justify-content-end">
+    <a href="{% url 'core:semestre1_generer_pdf' %}?type=moyennes{% if selected_import %}&import={{ selected_import }}{% endif %}{% if selected_niveau %}&niveau={{ selected_niveau }}{% endif %}{% if selected_classe %}&classe={{ selected_classe }}{% endif %}" class="btn btn-primary" target="_blank">
+        <i class="fas fa-file-pdf me-2"></i>Télécharger Statistiques PDF
+    </a>
+</div>
+
 {% if stats %}
 <!-- Éléments cachés pour stocker les informations d'exportation -->
 <div id="etablissement-info" style="display: none;"

@@ -161,6 +161,21 @@ class DonneesDetailleesEleves(models.Model):
     def __str__(self):
         return f"{self.nom} {self.prenom or ''}"
     
+    def get_prenom_normalise(self):
+        """
+        Retourne le prénom de l'élève en vérifiant différentes sources
+        """
+        # 1. D'abord essayer le champ prenom du modèle
+        if self.prenom:
+            return self.prenom
+        
+        # 2. Ensuite essayer dans le JSON des disciplines
+        for key in ['Prénom', 'prenom', 'PRENOM', 'Prenom']:
+            if key in self.disciplines and self.disciplines[key]:
+                return str(self.disciplines[key])
+        
+        return ""  # Renvoie une chaîne vide si aucun prénom trouvé
+    
     def get_moyennes_disciplines(self):
         """
         Retourne un dictionnaire avec uniquement les moyennes par discipline

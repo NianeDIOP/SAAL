@@ -16,6 +16,6 @@ urlpatterns = [
     path('semestre1/importation/<int:import_id>/delete/', views.semestre1_importation_delete, name='semestre1_importation_delete'),
     path('semestre1/analyse-moyennes/', views.semestre1_analyse_moyennes, name='semestre1_analyse_moyennes'),
     path('semestre1/analyse-disciplines/', views.semestre1_analyse_disciplines, name='semestre1_analyse_disciplines'),
-
+    path('semestre1/generer-pdf/', views.semestre1_generer_pdf, name='semestre1_generer_pdf'),
    
 ]

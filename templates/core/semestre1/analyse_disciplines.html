@@ -198,6 +198,15 @@
         </form>
     </div>
 </div>
+
+<!-- Ajoutez ce code juste après le div des filtres dans templates/core/semestre1/analyse_disciplines.html -->
+
+<div class="mb-3 d-flex justify-content-end">
+    <a href="{% url 'core:semestre1_generer_pdf' %}?type=disciplines{% if selected_import %}&import={{ selected_import }}{% endif %}{% if selected_niveau %}&niveau={{ selected_niveau }}{% endif %}{% if selected_classe %}&classe={{ selected_classe }}{% endif %}{% if selected_discipline %}&discipline={{ selected_discipline }}{% endif %}" class="btn btn-primary" target="_blank">
+        <i class="fas fa-file-pdf me-2"></i>Télécharger Statistiques PDF
+    </a>
+</div>
+
 <!-- Contenu principal -->
 {% if selected_discipline %}
     {% if donnees_discipline %}
@@ -390,26 +399,21 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <span class="badge bg-primary badge-rounded">{{ eleve.rang }}</span>
-                                    <span class="ms-2 fw-bold">{{ eleve.nom }} {% if eleve.prenom %}{{ eleve.prenom }}{% endif %}</span>
+                                    <span class="ms-2 fw-bold">{{ eleve.nom }} 
+                                        {% if eleve.prenom %}
+                                            {{ eleve.prenom }}
+                                        {% elif 'Prénom' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'Prénom' }}
+                                        {% elif 'prenom' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'prenom' }}
+                                        {% elif 'PRENOM' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'PRENOM' }}
+                                        {% elif 'Prenom' in eleve.disciplines %}
+                                            {{ eleve.disciplines|get_item:'Prenom' }}
+                                        {% endif %}
+                                    </span>
                                 </div>
                                 <span class="fw-bold">{{ eleve.moyenne_discipline|floatformat:2 }}</span>
-                            </div>
-                            <div class="small text-muted ps-4 mt-1">
-                                {% if eleve.classe_obj %}
-                                    {{ eleve.classe_obj.nom }} ({{ eleve.classe_obj.niveau.nom }})
-                                {% elif eleve.classe %}
-                                    {{ eleve.classe }}
-                                {% else %}
-                                    Classe non spécifiée
-                                {% endif %}
-                                | 
-                                {% if eleve.sexe == 'M' or eleve.sexe == 'H' %}
-                                    <i class="fas fa-male text-primary me-1"></i>Masculin
-                                {% elif eleve.sexe == 'F' %}
-                                    <i class="fas fa-female text-danger me-1"></i>Féminin
-                                {% else %}
-                                    Non précisé
-                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -460,17 +464,10 @@
                                     <td>{{ eleve.rang }}</td>
                                     <td>{{ eleve.nom }}</td>
                                     <td>
-                                        {% if eleve.prenom %}
-                                            {{ eleve.prenom }}
+                                        {% if eleve.get_prenom_normalise %}
+                                            {{ eleve.get_prenom_normalise }}
                                         {% else %}
-                                            {% with prenom_found=False %}
-                                                {% for key in 'Prénom,prenom,PRENOM,Prenom'|split:',' %}
-                                                    {% if not prenom_found and key in eleve.disciplines and eleve.disciplines|get_item:key %}
-                                                        {{ eleve.disciplines|get_item:key }}
-                                                        {% with prenom_found=True %}{% endwith %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            {% endwith %}
+                                            -
                                         {% endif %}
                                     </td>
                                     <td>
@@ -506,13 +503,22 @@
                                         </span>
                                     </td>
                                     <td>
-                                        {% with appreciation_found=False %}
-                                            {% for key in 'Appréciation,Appreciation,appreciation'|split:',' %}
-                                                {% if not appreciation_found and key in eleve.disciplines %}
-                                                    {{ eleve.disciplines|get_item:key }}
-                                                    {% with appreciation_found=True %}{% endwith %}
-                                                {% endif %}
-                                            {% endfor %}
+                                        {% with note=eleve.moyenne_discipline %}
+                                            {% if note > 16 %}
+                                                <span class="text-success">Excellent</span>
+                                            {% elif note > 15 %}
+                                                <span class="text-success">Très bien</span>
+                                            {% elif note >= 14 %}
+                                                <span class="text-primary">Bien</span>
+                                            {% elif note >= 12 %}
+                                                <span class="text-primary">Assez bien</span>
+                                            {% elif note >= 10 %}
+                                                <span class="text-warning">Passable</span>
+                                            {% elif note >= 7 %}
+                                                <span class="text-danger">Insuffisant</span>
+                                            {% else %}
+                                                <span class="text-danger">Très insuffisant</span>
+                                            {% endif %}
                                         {% endwith %}
                                     </td>
                                 </tr>

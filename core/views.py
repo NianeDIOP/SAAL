@@ -1355,7 +1355,7 @@ def semestre1_analyse_disciplines(request):
                         # Debug
                         print(f"Name match found for {eleve.nom} {eleve.prenom}")
                     
-                    # Si on a trouvé l'élève dans les moyennes, récupérer ses informations
+                   # Après avoir récupéré les données moyennes_eleve pour un élève
                     if moyennes_eleve:
                         # Récupérer les informations de classe et niveau
                         eleve.classe_obj = moyennes_eleve.classe_obj
@@ -1364,6 +1364,14 @@ def semestre1_analyse_disciplines(request):
                         # Récupérer le prénom si manquant
                         if not eleve.prenom and moyennes_eleve.prenom:
                             eleve.prenom = moyennes_eleve.prenom
+                    else:
+                        # Si on n'a pas trouvé l'élève dans les moyennes, essayer de récupérer le prénom directement des disciplines
+                        if not eleve.prenom:
+                            for key in ['Prénom', 'prenom', 'PRENOM', 'Prenom']:
+                                if key in eleve.disciplines and eleve.disciplines[key]:
+                                    eleve.prenom = str(eleve.disciplines[key])
+                                    print(f"Prénom extrait des disciplines pour {eleve.nom}: {eleve.prenom}")
+                                    break
                     
                     # Assigner d'autres informations manquantes si nécessaire
                     if not eleve.classe_obj and eleve.classe:
@@ -1527,3 +1535,43 @@ def semestre1_analyse_disciplines(request):
     }
     
     return render(request, 'core/semestre1/analyse_disciplines.html', context)
+
+# Ajoutez ces vues dans core/views.py
+
+def semestre1_generer_pdf(request):
+    """
+    Vue pour générer un PDF statistique pour le semestre 1
+    """
+    type_stats = request.GET.get('type', 'moyennes')  # 'moyennes' ou 'disciplines'
+    import_id = request.GET.get('import')
+    niveau_id = request.GET.get('niveau')
+    classe_id = request.GET.get('classe')
+    discipline = request.GET.get('discipline')
+    
+    if not import_id:
+        messages.error(request, "Veuillez sélectionner une importation pour générer le PDF.")
+        if type_stats == 'disciplines':
+            return redirect('core:semestre1_analyse_disciplines')
+        else:
+            return redirect('core:semestre1_analyse_moyennes')
+    
+    # Récupérer l'établissement
+    etablissement = Etablissement.objects.first()
+    
+    # Appeler la fonction de génération PDF
+    from .pdf_generator import generate_statistics_pdf
+    
+    try:
+        return generate_statistics_pdf(
+            request, 
+            type_stats=type_stats, 
+            import_id=import_id, 
+            niveau_id=niveau_id, 
+            classe_id=classe_id
+        )
+    except Exception as e:
+        messages.error(request, f"Erreur lors de la génération du PDF: {str(e)}")
+        if type_stats == 'disciplines':
+            return redirect('core:semestre1_analyse_disciplines')
+        else:
+            return redirect('core:semestre1_analyse_moyennes')
