@@ -1538,6 +1538,8 @@ def semestre1_analyse_disciplines(request):
 
 # Ajoutez ces vues dans core/views.py
 
+# Dans core/views.py - Mettre à jour la fonction semestre1_generer_pdf
+
 def semestre1_generer_pdf(request):
     """
     Vue pour générer un PDF statistique pour le semestre 1
@@ -1547,6 +1549,7 @@ def semestre1_generer_pdf(request):
     niveau_id = request.GET.get('niveau')
     classe_id = request.GET.get('classe')
     discipline = request.GET.get('discipline')
+    sexe = request.GET.get('sexe')  # Récupérer le filtre de sexe
     
     if not import_id:
         messages.error(request, "Veuillez sélectionner une importation pour générer le PDF.")
@@ -1567,7 +1570,9 @@ def semestre1_generer_pdf(request):
             type_stats=type_stats, 
             import_id=import_id, 
             niveau_id=niveau_id, 
-            classe_id=classe_id
+            classe_id=classe_id,
+            discipline_name=discipline,
+            sexe_filter=sexe  # Passer le filtre de sexe
         )
     except Exception as e:
         messages.error(request, f"Erreur lors de la génération du PDF: {str(e)}")

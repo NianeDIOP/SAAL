@@ -12,7 +12,10 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
 from reportlab.lib.enums import TA_CENTER
 from django.utils import timezone
-from .models import Etablissement, Classe, Niveau, DonneesMoyennesEleves, DonneesDetailleesEleves, ImportFichier
+from django.db.models import Q
+
+# Importer les modèles de l'application core
+from core.models import Etablissement, Classe, Niveau, DonneesMoyennesEleves, DonneesDetailleesEleves, ImportFichier
 
 def format_float(value):
     """
@@ -31,6 +34,31 @@ def format_float(value):
         return "{:.2f}".format(float(value)).replace('.', ',')
     except (ValueError, TypeError):
         return "0,00"
+
+def get_disciplines_for_import(import_obj):
+    """
+    Récupère les disciplines disponibles pour une importation
+    """
+    try:
+        # D'abord, essayer de récupérer depuis donnees_supplementaires
+        if hasattr(import_obj, 'donnees_supplementaires') and import_obj.donnees_supplementaires:
+            if 'disciplines' in import_obj.donnees_supplementaires:
+                return import_obj.donnees_supplementaires['disciplines']
+        
+        # Sinon, extraire les disciplines à partir des données détaillées
+        disciplines = set()
+        donnees_detaillees = DonneesDetailleesEleves.objects.filter(import_fichier=import_obj)
+        
+        for donnee in donnees_detaillees:
+            for key in donnee.disciplines.keys():
+                if key.endswith(" Moy D"):
+                    discipline = key.replace(" Moy D", "")
+                    disciplines.add(discipline)
+        
+        return sorted(list(disciplines))
+    except Exception as e:
+        print(f"Erreur lors de la récupération des disciplines: {e}")
+        return ["MATHS"]  # Valeur par défaut
 
 def aggregate_stats(stats_list, type_stats='moyennes'):
     """
@@ -90,13 +118,14 @@ def aggregate_stats(stats_list, type_stats='moyennes'):
     taux_f = round((reussite_filles / filles) * 100) if filles > 0 else 0
     taux_g = round((reussite_garcons / garcons) * 100) if garcons > 0 else 0
     
-    # Trouver min et max
-    min_moy = min((s['min'] for s in stats_list if s['min'] > 0), default=0)
-    max_moy = max((s['max'] for s in stats_list), default=0)
+    # Trouver min et max en ignorant les valeurs nulles pour le min
+    valid_mins = [s['min'] for s in stats_list if s['min'] > 0]
+    min_moy = min(valid_mins) if valid_mins else 0
+    max_moy = max(s['max'] for s in stats_list) if stats_list else 0
     
     # Calculer la moyenne pondérée
-    total_sum = sum(s['total'] * s['moyenne'] for s in stats_list)
-    moyenne = total_sum / total if total > 0 else 0
+    weighted_sum = sum(s['total'] * s['moyenne'] for s in stats_list if s['total'] > 0)
+    moyenne = weighted_sum / total if total > 0 else 0
     
     return {
         'total': total,
@@ -113,26 +142,12 @@ def aggregate_stats(stats_list, type_stats='moyennes'):
         'moyenne': moyenne,
         'indicateurs': indicateurs
     }
-
-def get_disciplines_for_import(import_obj):
-    """
-    Récupère les disciplines disponibles pour une importation
-    """
-    try:
-        # D'abord, essayer de récupérer depuis donnees_supplementaires
-        if hasattr(import_obj, 'donnees_supplementaires') and import_obj.donnees_supplementaires:
-            if 'disciplines' in import_obj.donnees_supplementaires:
-                return import_obj.donnees_supplementaires['disciplines']
-        
-        # Sinon, utiliser la méthode get_disciplines_disponibles
-        return DonneesDetailleesEleves.get_disciplines_disponibles(import_obj)
-    except Exception as e:
-        print(f"Erreur lors de la récupération des disciplines: {e}")
-        return ["MATHS"]  # Valeur par défaut
-
-def calculate_moyennes_stats(donnees_queryset, classe):
+def calculate_moyennes_stats(donnees_queryset, classe, sexe_filter=None):
     """
     Calcule les statistiques pour les moyennes générales d'une classe
+    :param donnees_queryset: Queryset des données de moyennes
+    :param classe: Objet classe pour lequel calculer les statistiques
+    :param sexe_filter: Filtre de sexe (M, F ou None)
     """
     # Filtrer les données pour la classe spécifiée
     donnees_classe = donnees_queryset.filter(classe_obj=classe)
@@ -148,26 +163,50 @@ def calculate_moyennes_stats(donnees_queryset, classe):
             'indicateurs': {'fel': 0, 'encou': 0, 'th': 0, 'pass': 0, 'insuff': 0}
         }
     
-    # Compter par sexe
+    # Compter par sexe en utilisant une approche plus robuste
     filles = 0
     garcons = 0
+    eleves_filtres = []
+    
     for eleve in donnees_classe:
-        sexe = None
+        sexe_eleve = None
+        
+        # Vérifier plusieurs clés possibles dans donnees_additionnelles
         if eleve.donnees_additionnelles:
             for key in ['Sexe', 'sexe', 'Genre', 'genre']:
                 if key in eleve.donnees_additionnelles:
-                    sexe_val = str(eleve.donnees_additionnelles[key]).upper()
+                    sexe_val = str(eleve.donnees_additionnelles[key]).upper().strip()
                     if sexe_val.startswith('F'):
-                        sexe = 'F'
+                        sexe_eleve = 'F'
                         break
-                    elif sexe_val.startswith('M') or sexe_val.startswith('H'):
-                        sexe = 'M'
+                    elif sexe_val.startswith('M') or sexe_val.startswith('G') or sexe_val.startswith('H'):
+                        sexe_eleve = 'M'
                         break
         
-        if sexe == 'F':
-            filles += 1
+        # Appliquer le filtre de sexe si spécifié
+        if sexe_filter:
+            if sexe_eleve == sexe_filter:
+                eleves_filtres.append(eleve)
+                if sexe_eleve == 'F':
+                    filles += 1
+                else:
+                    garcons += 1
         else:
-            garcons += 1
+            eleves_filtres.append(eleve)
+            if sexe_eleve == 'F':
+                filles += 1
+            else:
+                garcons += 1
+    
+    # Si aucun élève ne correspond au filtre de sexe
+    if not eleves_filtres:
+        return {
+            'total': 0, 'filles': 0, 'garcons': 0,
+            'taux': 0, 'taux_f': 0, 'taux_g': 0,
+            'total_reussite': 0, 'filles_reussite': 0, 'garcons_reussite': 0,
+            'max': 0, 'min': 0, 'moyenne': 0,
+            'indicateurs': {'fel': 0, 'encou': 0, 'th': 0, 'pass': 0, 'insuff': 0}
+        }
     
     # Calculer les moyennes et taux de réussite
     moyennes = []
@@ -180,45 +219,52 @@ def calculate_moyennes_stats(donnees_queryset, classe):
     reussite_garcons = 0
     
     # Compteurs pour indicateurs
-    fel = 0  # Félicitations (>= 16)
-    encou = 0  # Encouragements (>= 14 et < 16)
-    th = 0  # Tableau d'honneur (>= 12 et < 14)
-    passable = 0  # Passable (>= 10 et < 12)
-    insuff = 0  # Insuffisant (< 10)
+    fel = 0      # Félicitations (>= 16)
+    encou = 0    # Encouragements (>= 14 et < 16)
+    th = 0       # Tableau d'honneur (>= 12 et < 14)
+    passable = 0 # Passable (>= 10 et < 12)
+    insuff = 0   # Insuffisant (< 10)
     
-    for eleve in donnees_classe:
+    for eleve in eleves_filtres:
         if eleve.moyenne_generale is not None:
             try:
-                moyenne = float(str(eleve.moyenne_generale).replace(',', '.'))
+                # Convertir en float proprement
+                if isinstance(eleve.moyenne_generale, str):
+                    moyenne = float(eleve.moyenne_generale.replace(',', '.'))
+                else:
+                    moyenne = float(eleve.moyenne_generale)
+                
                 moyennes.append(moyenne)
                 
-                # Min/Max
-                min_moy = min(min_moy, moyenne)
+                # Min/Max en ignorant les valeurs nulles pour le min
+                if moyenne > 0:
+                    min_moy = min(min_moy, moyenne)
                 max_moy = max(max_moy, moyenne)
                 
-                # Réussite
+                # Réussite (moyenne >= 10)
                 if moyenne >= 10:
                     reussite_total += 1
                     
-                    # Par sexe
-                    sexe = None
+                    # Déterminer le sexe pour les statistiques de réussite
+                    sexe_eleve = None
                     if eleve.donnees_additionnelles:
                         for key in ['Sexe', 'sexe', 'Genre', 'genre']:
                             if key in eleve.donnees_additionnelles:
-                                sexe_val = str(eleve.donnees_additionnelles[key]).upper()
+                                sexe_val = str(eleve.donnees_additionnelles[key]).upper().strip()
                                 if sexe_val.startswith('F'):
-                                    sexe = 'F'
+                                    sexe_eleve = 'F'
                                     break
-                                elif sexe_val.startswith('M') or sexe_val.startswith('H'):
-                                    sexe = 'M'
+                                elif sexe_val.startswith('M') or sexe_val.startswith('G') or sexe_val.startswith('H'):
+                                    sexe_eleve = 'M'
                                     break
                     
-                    if sexe == 'F':
+                    # Réussite par sexe
+                    if sexe_eleve == 'F':
                         reussite_filles += 1
                     else:
                         reussite_garcons += 1
                 
-                # Indicateurs
+                # Indicateurs de performance
                 if moyenne >= 16:
                     fel += 1
                 elif moyenne >= 14:
@@ -229,21 +275,28 @@ def calculate_moyennes_stats(donnees_queryset, classe):
                     passable += 1
                 else:
                     insuff += 1
+                    
             except (ValueError, TypeError):
+                # Ignorer les valeurs non numériques
                 pass
     
     # Calculer la moyenne de classe
     moy_generale = sum(moyennes) / len(moyennes) if moyennes else 0
+    
+    # Mettre à jour le total avec le nombre d'élèves filtrés
+    total = len(eleves_filtres)
     
     # Calculer les taux de réussite
     taux = round((reussite_total / total) * 100) if total > 0 else 0
     taux_f = round((reussite_filles / filles) * 100) if filles > 0 else 0
     taux_g = round((reussite_garcons / garcons) * 100) if garcons > 0 else 0
     
-    # Si aucune moyenne n'a été trouvée
+    # Si aucune moyenne n'a été trouvée ou valeurs par défaut
     if not moyennes:
         min_moy = 0
         max_moy = 0
+    elif min_moy == float('inf'):
+        min_moy = 0
     
     return {
         'total': total,
@@ -267,9 +320,13 @@ def calculate_moyennes_stats(donnees_queryset, classe):
         }
     }
 
-def calculate_disciplines_stats(import_obj, classe, discipline_name):
+def calculate_disciplines_stats(import_obj, classe, discipline_name, sexe_filter=None):
     """
     Calcule les statistiques pour une discipline spécifique d'une classe
+    :param import_obj: Objet d'importation
+    :param classe: Objet classe
+    :param discipline_name: Nom de la discipline
+    :param sexe_filter: Filtre de sexe (M, F ou None)
     """
     # Pour les disciplines, nous devons utiliser DonneesDetailleesEleves
     eleves_detailles = DonneesDetailleesEleves.objects.filter(
@@ -306,9 +363,10 @@ def calculate_disciplines_stats(import_obj, classe, discipline_name):
             'indicateurs': {'tb': 0, 'bien': 0, 'abien': 0, 'pass': 0, 'insuf': 0, 'faible': 0}
         }
     
-    # Compter par sexe
+    # Compter par sexe avec une approche plus robuste
     filles = 0
     garcons = 0
+    eleves_filtres = []
     
     # Moyennes et réussite
     moyennes = []
@@ -321,52 +379,78 @@ def calculate_disciplines_stats(import_obj, classe, discipline_name):
     reussite_garcons = 0
     
     # Compteurs pour indicateurs
-    tb = 0  # Très bien (>= 16)
-    bien = 0  # Bien (>= 14 et < 16)
-    abien = 0  # Assez bien (>= 12 et < 14)
-    passable = 0  # Passable (>= 10 et < 12)
-    insuf = 0  # Insuffisant (>= 8 et < 10)
+    tb = 0      # Très bien (>= 16)
+    bien = 0    # Bien (>= 14 et < 16)
+    abien = 0   # Assez bien (>= 12 et < 14)
+    passable = 0 # Passable (>= 10 et < 12)
+    insuf = 0   # Insuffisant (>= 8 et < 10)
     faible = 0  # Faible (< 8)
     
     for eleve in eleves_detailles:
-        # Déterminer le sexe
-        sexe = None
-        if hasattr(eleve, 'get_sexe_normalise'):
-            sexe = eleve.get_sexe_normalise()
-        else:
-            # Tentative manuelle de détermination du sexe
-            if 'Sexe' in eleve.disciplines:
-                sexe_val = str(eleve.disciplines['Sexe']).upper()
-                if sexe_val.startswith('F'):
-                    sexe = 'F'
-                elif sexe_val.startswith('M') or sexe_val.startswith('H'):
-                    sexe = 'M'
+        # Déterminer le sexe de façon plus robuste
+        sexe_eleve = None
         
-        if sexe == 'F':
+        # Recherche du sexe dans plusieurs sources possibles
+        # 1. Utiliser la méthode get_sexe_normalise si disponible
+        if hasattr(eleve, 'get_sexe_normalise'):
+            sexe_eleve = eleve.get_sexe_normalise()
+        
+        # 2. Rechercher dans les disciplines
+        if not sexe_eleve and 'Sexe' in eleve.disciplines:
+            sexe_val = str(eleve.disciplines['Sexe']).upper().strip()
+            if sexe_val.startswith('F'):
+                sexe_eleve = 'F'
+            elif sexe_val.startswith('M') or sexe_val.startswith('G') or sexe_val.startswith('H'):
+                sexe_eleve = 'M'
+        
+        # 3. Rechercher dans d'autres clés possibles des disciplines
+        if not sexe_eleve:
+            for key in ['sexe', 'Genre', 'genre']:
+                if key in eleve.disciplines:
+                    sexe_val = str(eleve.disciplines[key]).upper().strip()
+                    if sexe_val.startswith('F'):
+                        sexe_eleve = 'F'
+                        break
+                    elif sexe_val.startswith('M') or sexe_val.startswith('G') or sexe_val.startswith('H'):
+                        sexe_eleve = 'M'
+                        break
+        
+        # Appliquer le filtre de sexe si spécifié
+        if sexe_filter and sexe_eleve != sexe_filter:
+            continue
+        
+        # Par défaut, si aucun sexe n'est déterminé, considérer comme garçon
+        if sexe_eleve == 'F':
             filles += 1
         else:
             garcons += 1
+            
+        eleves_filtres.append(eleve)
         
-        # Vérifier si la discipline existe
-        if moy_key in eleve.disciplines and eleve.disciplines[moy_key]:
+        # Vérifier si la discipline existe dans les données de l'élève
+        if moy_key in eleve.disciplines and eleve.disciplines[moy_key] is not None:
             try:
-                # Convertir la moyenne en float
-                moyenne = float(str(eleve.disciplines[moy_key]).replace(',', '.'))
+                # Convertir la note en float
+                note_str = str(eleve.disciplines[moy_key]).replace(',', '.')
+                moyenne = float(note_str)
+                
+                # Ajouter à la liste des moyennes
                 moyennes.append(moyenne)
                 
-                # Min/Max
-                min_moy = min(min_moy, moyenne)
+                # Min/Max (ne prendre en compte que les valeurs > 0 pour le min)
+                if moyenne > 0:
+                    min_moy = min(min_moy, moyenne)
                 max_moy = max(max_moy, moyenne)
                 
-                # Réussite
+                # Réussite (moyenne >= 10)
                 if moyenne >= 10:
                     reussite_total += 1
-                    if sexe == 'F':
+                    if sexe_eleve == 'F':
                         reussite_filles += 1
                     else:
                         reussite_garcons += 1
                 
-                # Indicateurs
+                # Indicateurs de performance
                 if moyenne >= 16:
                     tb += 1
                 elif moyenne >= 14:
@@ -379,10 +463,25 @@ def calculate_disciplines_stats(import_obj, classe, discipline_name):
                     insuf += 1
                 else:
                     faible += 1
+                    
             except (ValueError, TypeError):
+                # Ignorer les valeurs non numériques
                 pass
     
-    # Calculer la moyenne de discipline
+    # Mettre à jour le total avec le nombre d'élèves filtrés
+    total = len(eleves_filtres)
+    
+    # Si aucun élève ne correspond au filtre
+    if total == 0:
+        return {
+            'total': 0, 'filles': 0, 'garcons': 0,
+            'taux': 0, 'taux_f': 0, 'taux_g': 0,
+            'total_reussite': 0, 'filles_reussite': 0, 'garcons_reussite': 0,
+            'max': 0, 'min': 0, 'moyenne': 0,
+            'indicateurs': {'tb': 0, 'bien': 0, 'abien': 0, 'pass': 0, 'insuf': 0, 'faible': 0}
+        }
+    
+    # Calculer la moyenne générale de la discipline
     moy_generale = sum(moyennes) / len(moyennes) if moyennes else 0
     
     # Calculer les taux de réussite
@@ -390,10 +489,12 @@ def calculate_disciplines_stats(import_obj, classe, discipline_name):
     taux_f = round((reussite_filles / filles) * 100) if filles > 0 else 0
     taux_g = round((reussite_garcons / garcons) * 100) if garcons > 0 else 0
     
-    # Si aucune moyenne n'a été trouvée
+    # Si aucune moyenne trouvée ou valeurs par défaut
     if not moyennes:
         min_moy = 0
         max_moy = 0
+    elif min_moy == float('inf'):
+        min_moy = 0
     
     return {
         'total': total,
@@ -417,8 +518,7 @@ def calculate_disciplines_stats(import_obj, classe, discipline_name):
             'faible': faible
         }
     }
-
-def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, niveau_id=None, classe_id=None, discipline_name=None):
+def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, niveau_id=None, classe_id=None, discipline_name=None, sexe_filter=None):
     """
     Génère un PDF avec les statistiques des moyennes ou disciplines
     :param type_stats: 'moyennes' ou 'disciplines'
@@ -426,6 +526,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     :param niveau_id: ID du niveau à filtrer (optionnel)
     :param classe_id: ID de la classe à filtrer (optionnel)
     :param discipline_name: Nom de la discipline pour le type 'disciplines' (optionnel)
+    :param sexe_filter: Filtre pour le sexe (M, F ou None) (optionnel)
     """
     # Récupérer l'établissement actif
     etablissement = Etablissement.objects.first()
@@ -474,12 +575,13 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     # Créer un tampon de mémoire pour le PDF
     buffer = BytesIO()
     
-    # Créer le document PDF
+    # Créer le document PDF avec un format paysage (A4 horizontal)
+    page_width, page_height = landscape(A4)
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=30,
-        leftMargin=30,
+        rightMargin=10,
+        leftMargin=10,
         topMargin=30,
         bottomMargin=30
     )
@@ -526,7 +628,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     
     # Établissement et année scolaire - en ligne avec alignement différent
     data = [[Paragraph(f"<b>{etablissement.nom}</b>", styles['Normal']), 
-            Paragraph(f"Année Scolaire : <b>{etablissement.annee_scolaire_active}</b>", styles['Normal'])]]
+             Paragraph(f"Année Scolaire : <b>{etablissement.annee_scolaire_active}</b>", styles['Normal'])]]
     
     header_table = Table(data, colWidths=[doc.width/2.0]*2)
     header_table.setStyle(TableStyle([
@@ -541,17 +643,22 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     elements.append(Paragraph(title, title_style))
     elements.append(Spacer(1, 0.2*inch))
     
+    # Information additionnelle - filtre de sexe si appliqué
+    if sexe_filter:
+        sexe_info = f"Filtré par sexe: {'Féminin' if sexe_filter == 'F' else 'Masculin'}"
+        elements.append(Paragraph(sexe_info, center_style))
+        elements.append(Spacer(1, 0.1*inch))
+    
     # Préparer les données pour le tableau
     table_data = []
     
-    # En-têtes du tableau
-    # Ajustement pour correspondre exactement aux exemples
+    # En-têtes du tableau ajustés selon le type de statistiques
     if type_stats == 'moyennes':
         headers_row1 = [
             'EFFECTIFS', '', '', 
             'MOYENNES >=10', '', '', 
             'POURCENTAGES >=10', '', '', 
-            'INDICATEURS DE PERFORMANCES', '', '', '', ''
+            'INDICATEURS DE PERFORMANCES', '', '', '', '', ''
         ]
         
         headers_row2 = [
@@ -566,7 +673,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
             'EFFECTIFS', '', '', 
             'POURCENTAGES >=10', '', '', 
             'MOYENNES >=10', '', '', 
-            'INDICATEURS DE PERFORMANCES', '', '', '', '', ''
+            'INDICATEURS DE PERFORMANCES', '', '', '', '', '', ''
         ]
         
         headers_row2 = [
@@ -577,7 +684,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
             'TB', 'BIEN', 'ABIEN', 'PASS', 'INSUF', 'FAIBLE'
         ]
     
-    # Ajout du premier en-tête avec span des colonnes
+    # Ajout des en-têtes
     table_data.append(headers_row1)
     table_data.append(headers_row2)
     
@@ -585,7 +692,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     class_stats = []
     for classe in classes:
         if type_stats == 'moyennes':
-            stats = calculate_moyennes_stats(donnees_moyennes, classe)
+            stats = calculate_moyennes_stats(donnees_moyennes, classe, sexe_filter)
             
             # Données pour le tableau, format selon l'exemple
             table_data.append([
@@ -609,7 +716,7 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
                 stats['indicateurs']['insuff']
             ])
         else:
-            stats = calculate_disciplines_stats(import_obj, classe, discipline_name)
+            stats = calculate_disciplines_stats(import_obj, classe, discipline_name, sexe_filter)
             
             # Données pour le tableau, format selon l'exemple
             table_data.append([
@@ -744,29 +851,29 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
                 total_stats['indicateurs']['faible']
             ])
     
-    # Ajustement des largeurs de colonnes pour améliorer la présentation
-    col_widths = [1.3*cm]  # Première colonne (CLASSE | NIVEAU)
+    # Définir les largeurs de colonnes pour que le tableau remplisse toute la page
+    # Calculer la largeur disponible
+    available_width = page_width - doc.leftMargin - doc.rightMargin
     
-    # Les 3 colonnes EFFECTIFS
-    col_widths.extend([0.9*cm] * 3)
-    
-    # Les 3 colonnes MOYENNES/POURCENTAGES >=10
-    col_widths.extend([0.9*cm] * 3)
-    
-    # Les 3 colonnes POURCENTAGES/MOYENNES >=10
-    col_widths.extend([0.9*cm] * 3)
-    
-    # Les 3 colonnes MAX, MIN, MOY G
-    col_widths.extend([0.9*cm] * 3)
-    
-    # Les colonnes d'indicateurs (5 ou 6 selon le type)
+    # Définir les largeurs relatives pour les colonnes
+    # Première colonne plus large, les autres uniformes
     if type_stats == 'moyennes':
-        col_widths.extend([0.9*cm] * 5)
+        total_cols = 18  # Nombre total de colonnes
+        first_col_width = available_width * 0.12  # 12% de la largeur pour la première colonne
+        other_col_width = (available_width - first_col_width) / (total_cols - 1)  # Largeur uniforme pour les autres
+        
+        col_widths = [first_col_width]  # Première colonne (CLASSE | NIVEAU)
+        col_widths.extend([other_col_width] * (total_cols - 1))  # Autres colonnes
     else:
-        col_widths.extend([0.9*cm] * 6)
+        total_cols = 19  # Nombre total de colonnes pour disciplines
+        first_col_width = available_width * 0.12  # 12% de la largeur pour la première colonne
+        other_col_width = (available_width - first_col_width) / (total_cols - 1)  # Largeur uniforme pour les autres
+        
+        col_widths = [first_col_width]  # Première colonne (CLASSE | NIVEAU)
+        col_widths.extend([other_col_width] * (total_cols - 1))  # Autres colonnes
     
-    # Créer le tableau
-    table = Table(table_data, colWidths=col_widths)
+    # Créer le tableau avec les largeurs définies
+    table = Table(table_data, colWidths=col_widths, repeatRows=2)  # repeatRows pour répéter les en-têtes sur chaque page
     
     # Style du tableau
     table_style = TableStyle([
@@ -779,13 +886,19 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         
+        # Alignement à gauche pour la première colonne (noms de classe/niveau)
+        ('ALIGN', (0, 2), (0, -1), 'LEFT'),
+        
         # Police en gras pour les en-têtes
         ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 1), 9),
         
         # Espacement des cellules
-        ('BOTTOMPADDING', (0, 0), (-1, 1), 5),
-        ('TOPPADDING', (0, 0), (-1, 1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        
+        # Taille plus petite pour les cellules de données
+        ('FONTSIZE', (0, 2), (-1, -1), 8),
         
         # Bordures pour toutes les cellules
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -793,14 +906,12 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
         # Fond bleu clair pour la ligne TOTAL
         ('BACKGROUND', (0, -1), (-1, -1), colors.lightblue),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        
-        # Style pour les niveaux
-        # Les lignes des niveaux sont après les classes mais avant le total
-        # Leur position dépend du nombre de classes
     ])
     
     # Fusion des cellules pour les groupes dans l'en-tête
-    # Effectifs (3 colonnes)
+    # Les sections d'en-tête varient selon le type de statistiques
+    
+    # Effectifs (4 colonnes incluant l'en-tête de section)
     table_style.add('SPAN', (0, 0), (3, 0))
     
     # MOYENNES/POURCENTAGES >=10 (3 colonnes)
@@ -809,13 +920,13 @@ def generate_statistics_pdf(request, type_stats='moyennes', import_id=None, nive
     # POURCENTAGES/MOYENNES >=10 (3 colonnes)
     table_style.add('SPAN', (7, 0), (9, 0))
     
-    # INDICATEURS DE PERFORMANCES (5 ou 6 colonnes selon le type)
+    # INDICATEURS DE PERFORMANCES (reste des colonnes)
     if type_stats == 'moyennes':
         table_style.add('SPAN', (10, 0), (17, 0))
     else:
         table_style.add('SPAN', (10, 0), (18, 0))
     
-    # Appliquer des styles pour les lignes de niveau
+    # Appliquer des styles pour les lignes de niveau et mettre en évidence
     num_classes = len(classes)
     for i in range(len(niveaux)):
         niveau_row = num_classes + 2 + i  # +2 pour les deux lignes d'en-tête
